@@ -58,10 +58,10 @@ func Listen(kademlia *Kademlia /* ip string, */, port int) {
 			kademliaId := NewKademliaID(message[1])
 			contacts := kademlia.LookupContact(kademliaId)
 
-			contactsData := kademlia.network.routingTable.me.ID.String() + " "
+			contactsData := kademlia.network.routingTable.me.ID.String()
 			for _, contact := range contacts {
 				fmt.Println("  - " + contact.ID.String() + " " + contact.Address)
-				contactsData += contact.ID.String() + " " + contact.Address
+				contactsData += " " + contact.ID.String() + " " + contact.Address
 			}
 
 			data := []byte(contactsData)
@@ -127,20 +127,16 @@ func (network *Network) SendPingMessage(contact *Contact) {
 
 func (network *Network) SendFindContactMessage(kademliaID *KademliaID) {
 
-	var closestContacts ContactCandidates
-	contacts := network.routingTable.FindClosestContacts(kademliaID, 3, false)
+	var closestContacts, contactedContacts, notContactedContacts ContactCandidates
+
+	contacts := network.routingTable.FindClosestContacts(kademliaID, bucketSize, false)
 	closestContacts.Append(contacts)
 	closestContacts.Sort()
+	notContactedContacts.Append(contacts)
 
-	stop := false
 	message := "FIND_NODE " + network.routingTable.me.ID.String() + " " + kademliaID.String()
-	for !stop {
-		var oldClosestContacts = closestContacts.GetContacts(bucketSize)
-
-		for _, contact := range contacts {
-			var newContact Contact
-			var newContacts []Contact
-
+	for notContactedContacts.Len() != 0 {
+		for _, contact := range notContactedContacts.GetContacts(3) {
 			// TODO: Sending to every closest node asynchronously
 			fmt.Printf("Sending to %s: %s\n", contact.ID.String(), message)
 			reply := network.SendUDPMessage(&contact, message)
@@ -148,33 +144,35 @@ func (network *Network) SendFindContactMessage(kademliaID *KademliaID) {
 
 			replyArgs := strings.Split(reply, " ")[1:]
 			for i := 0; i < len(replyArgs); i += 2 {
-				newContact = NewContact(NewKademliaID(replyArgs[i]), replyArgs[i+1])
-				newContact.CalcDistance(kademliaID)
+				newContact := NewContact(NewKademliaID(replyArgs[i]), replyArgs[i+1])
 				fmt.Printf("NewContact: %s", newContact.String())
 				if !closestContacts.Exists(&newContact) {
 					fmt.Printf(" -> Added")
-					newContacts = append(newContacts, newContact)
-					network.routingTable.AddContact(newContact)
+					newContact.CalcDistance(kademliaID)
+					closestContacts.AppendOne(newContact)
+				} else {
+					// TODO: Faire le CalcDistance sur le contact existant
 				}
 				fmt.Println()
 			}
 
-			closestContacts.Append(newContacts)
+			contactedContacts.AppendOne(contact)
 		}
 
 		closestContacts.Sort()
-		fmt.Printf("-----------------\nClosestContacts: %s\n", closestContacts.String())
-		stop = true
-		for i, contact := range closestContacts.GetContacts(bucketSize) {
-			fmt.Printf("Old: %s   Current: %s\n", oldClosestContacts[i].String(), contact.String())
-			if !oldClosestContacts[i].Equals(&contact) {
-				stop = false
-				break
+		fmt.Printf("-----------------\nClosestContacts: %s", closestContacts.String())
+		notContactedContacts.Empty()
+		for _, contact := range closestContacts.GetContacts(bucketSize) {
+			fmt.Printf("\nContact: %s", contact.String())
+			if !contactedContacts.Exists(&contact) {
+				fmt.Printf(" -> Not contacted")
+				notContactedContacts.AppendOne(contact)
 			}
 		}
+		fmt.Printf("\n\n")
 	}
 
-	fmt.Printf("-----------------\nClosestContacts (%s): %s\n", strconv.Itoa(bucketSize), closestContacts.String())
+	fmt.Printf("-----------------\nClosestContacts (%d): %s\n", bucketSize, closestContacts.String())
 
 }
 

@@ -16,6 +16,7 @@ func NewRoutingTable(me Contact) *RoutingTable {
 		routingTable.buckets[i] = newBucket()
 	}
 	routingTable.me = me
+	routingTable.me.CalcDistance(routingTable.me.ID)
 	return routingTable
 }
 

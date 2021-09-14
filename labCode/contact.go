@@ -46,8 +46,18 @@ type ContactCandidates struct {
 }
 
 // Append an array of Contacts to the ContactCandidates
+func (candidates *ContactCandidates) AppendOne(contact Contact) {
+	candidates.contacts = append(candidates.contacts, contact)
+}
+
+// Append an array of Contacts to the ContactCandidates
 func (candidates *ContactCandidates) Append(contacts []Contact) {
 	candidates.contacts = append(candidates.contacts, contacts...)
+}
+
+// Empty the contact list
+func (candidates *ContactCandidates) Empty() {
+	candidates.contacts = []Contact{}
 }
 
 // Exists retuns true if contact is already in the candidate list
