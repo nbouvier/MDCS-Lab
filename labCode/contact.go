@@ -1,4 +1,4 @@
-package d7024e
+package main
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ func NewContact(id *KademliaID, address string) Contact {
 	return Contact{id, address, nil}
 }
 
-// CalcDistance calculates the distance to the target and 
+// CalcDistance calculates the distance to the target and
 // fills the contacts distance field
 func (contact *Contact) CalcDistance(target *KademliaID) {
 	contact.distance = contact.ID.CalcDistance(target)
@@ -27,6 +27,11 @@ func (contact *Contact) CalcDistance(target *KademliaID) {
 // Less returns true if contact.distance < otherContact.distance
 func (contact *Contact) Less(otherContact *Contact) bool {
 	return contact.distance.Less(otherContact.distance)
+}
+
+// Equals returns true if both contact has the same KademliaID
+func (contact *Contact) Equals(otherContact *Contact) bool {
+	return contact.ID.Equals(otherContact.ID)
 }
 
 // String returns a simple string representation of a Contact
@@ -45,8 +50,22 @@ func (candidates *ContactCandidates) Append(contacts []Contact) {
 	candidates.contacts = append(candidates.contacts, contacts...)
 }
 
+// Exists retuns true if contact is already in the candidate list
+func (candidates *ContactCandidates) Exists(contact *Contact) bool {
+	for _, candidate := range candidates.contacts {
+		if candidate.Equals(contact) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // GetContacts returns the first count number of Contacts
 func (candidates *ContactCandidates) GetContacts(count int) []Contact {
+	if count > candidates.Len() {
+		count = candidates.Len()
+	}
 	return candidates.contacts[:count]
 }
 
@@ -66,8 +85,17 @@ func (candidates *ContactCandidates) Swap(i, j int) {
 	candidates.contacts[i], candidates.contacts[j] = candidates.contacts[j], candidates.contacts[i]
 }
 
-// Less returns true if the Contact at index i is smaller than 
+// Less returns true if the Contact at index i is smaller than
 // the Contact at index j
 func (candidates *ContactCandidates) Less(i, j int) bool {
 	return candidates.contacts[i].Less(&candidates.contacts[j])
+}
+
+// String returns a simple string representation of a ContactCandidates
+func (candidates *ContactCandidates) String() string {
+	string := "contactCandidates[\n"
+	for _, contact := range candidates.contacts {
+		string += "   | " + contact.String() + "\n"
+	}
+	return string + "]"
 }

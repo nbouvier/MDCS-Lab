@@ -1,10 +1,18 @@
-package d7024e
+package main
 
 type Kademlia struct {
+	network *Network
 }
 
-func (kademlia *Kademlia) LookupContact(target *Contact) {
-	// TODO
+// NewKademlia returns a new instance of Kademlia
+func NewKademlia(address string) *Kademlia {
+	kademlia := &Kademlia{}
+	kademlia.network = NewNetwork(NewContact(NewRandomKademliaID(), address))
+	return kademlia
+}
+
+func (kademlia *Kademlia) LookupContact(target *KademliaID /* target *Contact */) []Contact {
+	return kademlia.network.routingTable.FindClosestContacts(target, bucketSize, true)
 }
 
 func (kademlia *Kademlia) LookupData(hash string) {

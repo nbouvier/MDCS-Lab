@@ -1,7 +1,6 @@
-package d7024e
+package main
 
 const bucketSize = 20
-
 
 // RoutingTable definition
 // keeps a refrence contact of me and an array of buckets
@@ -28,7 +27,7 @@ func (routingTable *RoutingTable) AddContact(contact Contact) {
 }
 
 // FindClosestContacts finds the count closest Contacts to the target in the RoutingTable
-func (routingTable *RoutingTable) FindClosestContacts(target *KademliaID, count int) []Contact {
+func (routingTable *RoutingTable) FindClosestContacts(target *KademliaID, count int, addMe bool) []Contact {
 	var candidates ContactCandidates
 	bucketIndex := routingTable.getBucketIndex(target)
 	bucket := routingTable.buckets[bucketIndex]
@@ -46,11 +45,11 @@ func (routingTable *RoutingTable) FindClosestContacts(target *KademliaID, count 
 		}
 	}
 
-	candidates.Sort()
-
-	if count > candidates.Len() {
-		count = candidates.Len()
+	if addMe {
+		candidates.Append([]Contact{routingTable.me})
 	}
+
+	candidates.Sort()
 
 	return candidates.GetContacts(count)
 }
