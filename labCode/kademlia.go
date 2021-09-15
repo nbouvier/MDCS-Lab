@@ -12,7 +12,7 @@ func NewKademlia(address string) *Kademlia {
 }
 
 func (kademlia *Kademlia) LookupContact(target *KademliaID /* target *Contact */) []Contact {
-	return kademlia.network.routingTable.FindClosestContacts(target, bucketSize, true)
+	return kademlia.network.routingTable.FindClosestContacts(target, bucketSize)
 }
 
 func (kademlia *Kademlia) LookupData(hash string) {

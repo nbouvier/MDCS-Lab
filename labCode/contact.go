@@ -61,14 +61,14 @@ func (candidates *ContactCandidates) Empty() {
 }
 
 // Exists retuns true if contact is already in the candidate list
-func (candidates *ContactCandidates) Exists(contact *Contact) bool {
+func (candidates *ContactCandidates) Find(kademliaID *KademliaID) *Contact {
 	for _, candidate := range candidates.contacts {
-		if candidate.Equals(contact) {
-			return true
+		if candidate.ID.Equals(kademliaID) {
+			return &candidate
 		}
 	}
 
-	return false
+	return nil
 }
 
 // GetContacts returns the first count number of Contacts

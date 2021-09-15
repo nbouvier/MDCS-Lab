@@ -16,7 +16,7 @@ func NewRoutingTable(me Contact) *RoutingTable {
 		routingTable.buckets[i] = newBucket()
 	}
 	routingTable.me = me
-	routingTable.me.CalcDistance(routingTable.me.ID)
+	routingTable.AddContact(routingTable.me)
 	return routingTable
 }
 
@@ -28,7 +28,7 @@ func (routingTable *RoutingTable) AddContact(contact Contact) {
 }
 
 // FindClosestContacts finds the count closest Contacts to the target in the RoutingTable
-func (routingTable *RoutingTable) FindClosestContacts(target *KademliaID, count int, addMe bool) []Contact {
+func (routingTable *RoutingTable) FindClosestContacts(target *KademliaID, count int) []Contact {
 	var candidates ContactCandidates
 	bucketIndex := routingTable.getBucketIndex(target)
 	bucket := routingTable.buckets[bucketIndex]
@@ -44,10 +44,6 @@ func (routingTable *RoutingTable) FindClosestContacts(target *KademliaID, count 
 			bucket = routingTable.buckets[bucketIndex+i]
 			candidates.Append(bucket.GetContactAndCalcDistance(target))
 		}
-	}
-
-	if addMe {
-		candidates.Append([]Contact{routingTable.me})
 	}
 
 	candidates.Sort()

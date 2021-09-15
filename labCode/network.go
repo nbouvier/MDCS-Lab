@@ -129,7 +129,7 @@ func (network *Network) SendFindContactMessage(kademliaID *KademliaID) {
 
 	var closestContacts, contactedContacts, notContactedContacts ContactCandidates
 
-	contacts := network.routingTable.FindClosestContacts(kademliaID, bucketSize, false)
+	contacts := network.routingTable.FindClosestContacts(kademliaID, bucketSize)
 	closestContacts.Append(contacts)
 	closestContacts.Sort()
 	notContactedContacts.Append(contacts)
@@ -137,23 +137,28 @@ func (network *Network) SendFindContactMessage(kademliaID *KademliaID) {
 	message := "FIND_NODE " + network.routingTable.me.ID.String() + " " + kademliaID.String()
 	for notContactedContacts.Len() != 0 {
 		for _, contact := range notContactedContacts.GetContacts(3) {
-			// TODO: Sending to every closest node asynchronously
-			fmt.Printf("Sending to %s: %s\n", contact.ID.String(), message)
-			reply := network.SendUDPMessage(&contact, message)
-			fmt.Printf("Reply: %s\n", reply)
 
-			replyArgs := strings.Split(reply, " ")[1:]
-			for i := 0; i < len(replyArgs); i += 2 {
-				newContact := NewContact(NewKademliaID(replyArgs[i]), replyArgs[i+1])
-				fmt.Printf("NewContact: %s", newContact.String())
-				if !closestContacts.Exists(&newContact) {
-					fmt.Printf(" -> Added")
-					newContact.CalcDistance(kademliaID)
-					closestContacts.AppendOne(newContact)
-				} else {
-					// TODO: Faire le CalcDistance sur le contact existant
+			if !contact.Equals(&network.routingTable.me) {
+				// TODO: Sending to every closest node asynchronously
+				fmt.Printf("Sending to %s: %s\n", contact.ID.String(), message)
+				reply := network.SendUDPMessage(&contact, message)
+				fmt.Printf("Reply: %s\n", reply)
+
+				replyArgs := strings.Split(reply, " ")[1:]
+				for i := 0; i < len(replyArgs); i += 2 {
+					newKademliaID := NewKademliaID(replyArgs[i])
+					existingContact := closestContacts.Find(newKademliaID)
+					if existingContact == nil {
+						newContact := NewContact(newKademliaID, replyArgs[i+1])
+						newContact.CalcDistance(kademliaID)
+						closestContacts.AppendOne(newContact)
+						fmt.Printf("Contact: %s -> Added", newContact.String())
+					} else {
+						existingContact.CalcDistance(kademliaID)
+						fmt.Printf("Contact: %s", existingContact.String())
+					}
+					fmt.Println()
 				}
-				fmt.Println()
 			}
 
 			contactedContacts.AppendOne(contact)
@@ -164,7 +169,7 @@ func (network *Network) SendFindContactMessage(kademliaID *KademliaID) {
 		notContactedContacts.Empty()
 		for _, contact := range closestContacts.GetContacts(bucketSize) {
 			fmt.Printf("\nContact: %s", contact.String())
-			if !contactedContacts.Exists(&contact) {
+			if contactedContacts.Find(contact.ID) == nil {
 				fmt.Printf(" -> Not contacted")
 				notContactedContacts.AppendOne(contact)
 			}
