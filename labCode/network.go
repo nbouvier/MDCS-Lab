@@ -13,6 +13,9 @@ import (
 	"github.com/tatsushid/go-fastping"
 )
 
+// the static number of simultaneous asynchronous sends
+const alpha = 3
+
 type Network struct {
 	routingTable *RoutingTable
 }
@@ -46,7 +49,7 @@ func Listen(kademlia *Kademlia /* ip string, */, port int) {
 
 	for {
 		n, addr, err := connection.ReadFromUDP(buffer)
-		fmt.Printf("\n-> Received: %s %s\n", addr, string(buffer[0:n]))
+		fmt.Printf("\n-> Received from %s: %s\n", addr, string(buffer[0:n]))
 		message := strings.Split(string(buffer), " ")
 
 		switch message[0] {
@@ -55,24 +58,23 @@ func Listen(kademlia *Kademlia /* ip string, */, port int) {
 			break
 
 		case "FIND_NODE":
-			kademliaId := NewKademliaID(message[1])
-			contacts := kademlia.LookupContact(kademliaId)
+			kademliaID := NewKademliaID(message[1])
+			contacts := kademlia.network.routingTable.FindClosestContacts(kademliaID, bucketSize)
 
 			contactsData := kademlia.network.routingTable.me.ID.String()
 			for _, contact := range contacts {
-				fmt.Println("  - " + contact.ID.String() + " " + contact.Address)
 				contactsData += " " + contact.ID.String() + " " + contact.Address
 			}
 
 			data := []byte(contactsData)
-			fmt.Printf("-> Response: %s\n\n", string(data))
+			fmt.Printf("-> Response to %s: %s\n\n", addr, string(data))
 			_, err = connection.WriteToUDP(data, addr)
 			if err != nil {
 				fmt.Println(err)
 				continue
 			}
 
-			kademlia.network.routingTable.AddContact(NewContact(kademliaId, addr.IP.String()))
+			kademlia.network.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
 
 			break
 
@@ -125,59 +127,27 @@ func (network *Network) SendPingMessage(contact *Contact) {
 
 }
 
-func (network *Network) SendFindContactMessage(kademliaID *KademliaID) {
+func (network *Network) SendFindContactMessage(searchedContact *Contact, target *Contact, closestContacts *ContactCandidates, contactChannel chan *Contact) {
 
-	var closestContacts, contactedContacts, notContactedContacts ContactCandidates
+	message := "FIND_NODE " + network.routingTable.me.ID.String() + " " + searchedContact.ID.String()
 
-	contacts := network.routingTable.FindClosestContacts(kademliaID, bucketSize)
-	closestContacts.Append(contacts)
-	closestContacts.Sort()
-	notContactedContacts.Append(contacts)
+	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
+	reply := network.SendUDPMessage(target, message)
 
-	message := "FIND_NODE " + network.routingTable.me.ID.String() + " " + kademliaID.String()
-	for notContactedContacts.Len() != 0 {
-		for _, contact := range notContactedContacts.GetContacts(3) {
-
-			if !contact.Equals(&network.routingTable.me) {
-				// TODO: Sending to every closest node asynchronously
-				fmt.Printf("Sending to %s: %s\n", contact.ID.String(), message)
-				reply := network.SendUDPMessage(&contact, message)
-				fmt.Printf("Reply: %s\n", reply)
-
-				replyArgs := strings.Split(reply, " ")[1:]
-				for i := 0; i < len(replyArgs); i += 2 {
-					newKademliaID := NewKademliaID(replyArgs[i])
-					existingContact := closestContacts.Find(newKademliaID)
-					if existingContact == nil {
-						newContact := NewContact(newKademliaID, replyArgs[i+1])
-						newContact.CalcDistance(kademliaID)
-						closestContacts.AppendOne(newContact)
-						fmt.Printf("Contact: %s -> Added", newContact.String())
-					} else {
-						existingContact.CalcDistance(kademliaID)
-						fmt.Printf("Contact: %s", existingContact.String())
-					}
-					fmt.Println()
-				}
-			}
-
-			contactedContacts.AppendOne(contact)
+	replyArgs := strings.Split(reply, " ")[1:]
+	for i := 0; i < len(replyArgs); i += 2 {
+		newKademliaID := NewKademliaID(replyArgs[i])
+		existingContact := closestContacts.Find(newKademliaID)
+		if existingContact == nil {
+			newContact := NewContact(newKademliaID, replyArgs[i+1])
+			newContact.CalcDistance(searchedContact.ID)
+			closestContacts.AppendOne(newContact)
+		} else {
+			existingContact.CalcDistance(searchedContact.ID)
 		}
-
-		closestContacts.Sort()
-		fmt.Printf("-----------------\nClosestContacts: %s", closestContacts.String())
-		notContactedContacts.Empty()
-		for _, contact := range closestContacts.GetContacts(bucketSize) {
-			fmt.Printf("\nContact: %s", contact.String())
-			if contactedContacts.Find(contact.ID) == nil {
-				fmt.Printf(" -> Not contacted")
-				notContactedContacts.AppendOne(contact)
-			}
-		}
-		fmt.Printf("\n\n")
 	}
 
-	fmt.Printf("-----------------\nClosestContacts (%d): %s\n", bucketSize, closestContacts.String())
+	contactChannel <- target
 
 }
 

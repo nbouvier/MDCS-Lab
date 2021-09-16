@@ -60,7 +60,7 @@ func handleCommandLine(kademlia *Kademlia) {
 			}
 			fmt.Printf("Joining the network via %s (%s) ...\n", inputs[1], inputs[2])
 			kademlia.network.routingTable.AddContact(NewContact(NewKademliaID(inputs[2]), inputs[1]))
-			kademlia.network.SendFindContactMessage(kademlia.network.routingTable.me.ID)
+			kademlia.LookupContact(&kademlia.network.routingTable.me)
 			fmt.Print("Network joined.\n\n")
 			break
 
