@@ -5,12 +5,9 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/tatsushid/go-fastping"
 )
 
 // the static number of simultaneous asynchronous sends
@@ -49,10 +46,23 @@ func Listen(kademlia *Kademlia /* ip string, */, port int) {
 
 	for {
 		n, addr, err := connection.ReadFromUDP(buffer)
+		if err != nil {
+			fmt.Println(err)
+		}
 		fmt.Printf("\n-> Received from %s: %s\n", addr, string(buffer[0:n]))
 		message := strings.Split(string(buffer), " ")
 
 		switch message[0] {
+
+		case "PING":
+			kademliaID := NewKademliaID(message[1])
+
+			data := kademlia.network.routingTable.me.ID.String()
+			SendUDPResponse(data, addr, connection)
+
+			kademlia.network.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
+
+			break
 
 		case "STORE":
 			break
@@ -61,18 +71,12 @@ func Listen(kademlia *Kademlia /* ip string, */, port int) {
 			kademliaID := NewKademliaID(message[1])
 			contacts := kademlia.network.routingTable.FindClosestContacts(kademliaID, bucketSize)
 
-			contactsData := kademlia.network.routingTable.me.ID.String()
+			data := kademlia.network.routingTable.me.ID.String()
 			for _, contact := range contacts {
-				contactsData += " " + contact.ID.String() + " " + contact.Address
+				data += " " + contact.ID.String() + " " + contact.Address
 			}
 
-			data := []byte(contactsData)
-			fmt.Printf("-> Response to %s: %s\n\n", addr, string(data))
-			_, err = connection.WriteToUDP(data, addr)
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
+			SendUDPResponse(data, addr, connection)
 
 			kademlia.network.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
 
@@ -89,6 +93,16 @@ func Listen(kademlia *Kademlia /* ip string, */, port int) {
 
 }
 
+// Send stringData as an UDP response to addr
+func SendUDPResponse(stringData string, addr *net.UDPAddr, connection *net.UDPConn) {
+	data := []byte(stringData)
+	fmt.Printf("-> Response to %s: %s\n\n", addr, stringData)
+	_, err := connection.WriteToUDP(data, addr)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
 // Get preferred outbound ip of this machine
 func GetOutboundIP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
@@ -102,34 +116,23 @@ func GetOutboundIP() net.IP {
 	return localAddr.IP
 }
 
-func (network *Network) SendPingMessage(contact *Contact) {
+func (network *Network) SendPingMessage(target Contact, channel chan bool) {
 
-	p := fastping.NewPinger()
+	message := "PING " + network.routingTable.me.ID.String()
 
-	ra, err := net.ResolveIPAddr("ip4:icmp", contact.Address)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	p.AddIPAddr(ra)
-	p.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
-		fmt.Printf("IP Address: %s receive, RTT: %v\n", addr.String(), rtt)
-	}
-	p.OnIdle = func() {
-		fmt.Print("Pinging done.\n\n")
-	}
-
-	err = p.Run()
-	if err != nil {
-		fmt.Println(err)
+	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
+	reply := network.SendUDPMessage(&target, message)
+	if reply != "" {
+		channel <- true
+	} else {
+		channel <- false
 	}
 
 }
 
-func (network *Network) SendFindContactMessage(searchedContact *Contact, target *Contact, closestContacts *ContactCandidates, contactChannel chan *Contact) {
+func (network *Network) SendFindContactMessage(searchedKademliaID *KademliaID, target *Contact, closestContacts *ContactCandidates, channel chan *Contact) {
 
-	message := "FIND_NODE " + network.routingTable.me.ID.String() + " " + searchedContact.ID.String()
+	message := "FIND_NODE " + network.routingTable.me.ID.String() + " " + searchedKademliaID.String()
 
 	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
 	reply := network.SendUDPMessage(target, message)
@@ -140,14 +143,14 @@ func (network *Network) SendFindContactMessage(searchedContact *Contact, target 
 		existingContact := closestContacts.Find(newKademliaID)
 		if existingContact == nil {
 			newContact := NewContact(newKademliaID, replyArgs[i+1])
-			newContact.CalcDistance(searchedContact.ID)
+			newContact.CalcDistance(searchedKademliaID)
 			closestContacts.AppendOne(newContact)
 		} else {
-			existingContact.CalcDistance(searchedContact.ID)
+			existingContact.CalcDistance(searchedKademliaID)
 		}
 	}
 
-	contactChannel <- target
+	channel <- target
 
 }
 

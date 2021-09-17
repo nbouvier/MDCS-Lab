@@ -37,36 +37,44 @@ func handleCommandLine(kademlia *Kademlia) {
 		inputs := strings.Split(strings.TrimSpace(input), " ")
 		switch inputs[0] {
 
-		case "ping":
-			if len(inputs) < 2 {
-				fmt.Println("Error: You need to provide a KademliaID.\n     $ ping <kademlia_id>")
-				continue
-			}
-			fmt.Printf("Pinging %s ...\n", inputs[1])
-			// kademlia.network.SendPingMessage(inputs[1])
-			break
-
-		case "store":
-			fmt.Println("Sending to the network ...")
-			break
-
-		case "findValue":
-			break
-
 		case "join":
 			if len(inputs) < 3 {
 				fmt.Println("Error: You need to provide an ip address and a KademliaID.\n     $ join <ip_address> <kademlia_id>")
 				continue
 			}
-			fmt.Printf("Joining the network via %s (%s) ...\n", inputs[1], inputs[2])
-			kademlia.network.routingTable.AddContact(NewContact(NewKademliaID(inputs[2]), inputs[1]))
-			kademlia.LookupContact(&kademlia.network.routingTable.me)
+			ip, kademliaID := inputs[1], NewKademliaID(inputs[2])
+			fmt.Printf("Joining the network via %s (%s) ...\n", ip, kademliaID.String())
+			kademlia.network.routingTable.AddContact(NewContact(kademliaID, ip))
+			kademlia.LookupContact(kademlia.network.routingTable.me.ID)
 			fmt.Print("Network joined.\n\n")
 			break
 
-		case "exit":
-			fmt.Println("Leaving the network ...")
-			return
+		case "lookup":
+			if len(inputs) < 2 {
+				fmt.Println("Error: You need to provide a KademliaID. \n     $ lookup <kademlia_id>")
+			}
+			kademliaID := NewKademliaID(inputs[1])
+			fmt.Printf("Looking for %s ...\n", kademliaID.String())
+			contact := kademlia.LookupContact(kademliaID)
+			fmt.Printf("Found %s: %s.\n\n", kademliaID.String(), contact.String())
+			break
+
+		case "ping":
+			if len(inputs) < 2 {
+				fmt.Println("Error: You need to provide an IP address and a KademliaID. \n     $ ping <ip> <kademlia_id>")
+			}
+			ip, kademliaID := inputs[1], NewKademliaID(inputs[2])
+			channel := make(chan bool)
+			defer close(channel)
+			fmt.Printf("Pinging %s (%s) ...\n", ip, kademliaID)
+			go kademlia.network.SendPingMessage(NewContact(kademliaID, ip), channel)
+			done := <-channel
+			if done {
+				fmt.Printf("Successfully pinged %s.\n\n", kademliaID)
+			} else {
+				fmt.Printf("Couldn't ping %s.\n\n", kademliaID)
+			}
+			break
 
 		default:
 			fmt.Println("Invalid command, please try again.")
