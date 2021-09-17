@@ -13,6 +13,9 @@ import (
 // the static number of simultaneous asynchronous sends
 const alpha = 3
 
+// the static number of second before a RPC times out
+const delayBeforeTimeOut = 5
+
 type Network struct {
 	routingTable *RoutingTable
 }
@@ -116,16 +119,18 @@ func GetOutboundIP() net.IP {
 	return localAddr.IP
 }
 
-func (network *Network) SendPingMessage(target Contact, channel chan bool) {
+func (network *Network) SendPingMessage(target *Contact, channel chan bool) {
 
 	message := "PING " + network.routingTable.me.ID.String()
 
 	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
-	reply := network.SendUDPMessage(&target, message)
-	if reply != "" {
+	_, err := network.SendUDPMessage(target, message)
+
+	if err == nil {
 		channel <- true
 	} else {
 		channel <- false
+		fmt.Println(err)
 	}
 
 }
@@ -135,7 +140,13 @@ func (network *Network) SendFindContactMessage(searchedKademliaID *KademliaID, t
 	message := "FIND_NODE " + network.routingTable.me.ID.String() + " " + searchedKademliaID.String()
 
 	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
-	reply := network.SendUDPMessage(target, message)
+	reply, err := network.SendUDPMessage(target, message)
+
+	if err != nil {
+		fmt.Println(err)
+		channel <- nil
+		return
+	}
 
 	replyArgs := strings.Split(reply, " ")[1:]
 	for i := 0; i < len(replyArgs); i += 2 {
@@ -158,35 +169,44 @@ func (network *Network) SendFindDataMessage(hash string) {
 	// TODO
 }
 
-func (network *Network) SendStoreMessage(data []byte) {
-	// TODO
+func (network *Network) SendStoreMessage(data []byte, target *Contact, channel chan bool) {
+
+	message := "STORE " + network.routingTable.me.ID.String() + " " + NewKademliaID(string(data)).String()
+
+	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
+	_, err := network.SendUDPMessage(target, message)
+
+	if err == nil {
+		channel <- true
+	} else {
+		channel <- false
+		fmt.Println(err)
+	}
+
 }
 
-func (network *Network) SendUDPMessage(contact *Contact, message string) string {
+func (network *Network) SendUDPMessage(contact *Contact, message string) (string, error) {
 
 	ip := contact.Address + ":80"
 
 	s, err := net.ResolveUDPAddr("udp4", ip)
 	c, err := net.DialUDP("udp4", nil, s)
 	if err != nil {
-		fmt.Println(err)
-		return ""
+		return "", err
 	}
 	defer c.Close()
 
 	_, err = c.Write([]byte(message))
 	if err != nil {
-		fmt.Println(err)
-		return ""
+		return "", err
 	}
 
 	buffer := make([]byte, 1024)
 	n, _, err := c.ReadFromUDP(buffer)
 	if err != nil {
-		fmt.Println(err)
-		return ""
+		return "", err
 	}
 
-	return string(buffer[0:n])
+	return string(buffer[0:n]), nil
 
 }

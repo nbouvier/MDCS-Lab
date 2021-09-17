@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 )
 
 type Kademlia struct {
@@ -15,7 +16,27 @@ func NewKademlia(address string) *Kademlia {
 	return kademlia
 }
 
-func (kademlia *Kademlia) LookupContact(searchedKademliaID *KademliaID) Contact {
+func (kademlia *Kademlia) Ping(contact Contact) {
+
+	channel := make(chan bool)
+	defer close(channel)
+
+	go kademlia.network.SendPingMessage(&contact, channel)
+
+	select {
+
+	case <-channel:
+		fmt.Printf("Ping to %s (%s)succeed.\n", contact.Address, contact.ID.String())
+		kademlia.network.routingTable.AddContact(contact)
+
+	case <-time.After(delayBeforeTimeOut * time.Second):
+		fmt.Printf("Ping to %s (%s) timed out.\n", contact.Address, contact.ID.String())
+
+	}
+
+}
+
+func (kademlia *Kademlia) LookupContact(searchedKademliaID *KademliaID) []Contact {
 
 	var closestContacts, contactedContacts, notContactedContacts ContactCandidates
 	channel := make(chan *Contact)
@@ -39,11 +60,21 @@ func (kademlia *Kademlia) LookupContact(searchedKademliaID *KademliaID) Contact 
 			contactedContacts.AppendOne(contactsToContact[i])
 		}
 
+		// This is not totally reliable as if the first "SendFindContactMessage()"
+		// times out and finally finished before the n = alpha one, then we will
+		// count it twice : 1 for the time out and 1 for the no time out.
+		// Doing so, the n = alpha one won't be waited.
 		for i := 0; i < responseWaitingNumber; i++ {
-			contactedContact := <-channel
-			fmt.Printf("Response from %s\n", contactedContact.ID.String())
-			kademlia.network.routingTable.AddContact(*contactedContact)
-			// TODO: TTL
+			select {
+
+			case contactedContact := <-channel:
+				fmt.Printf("Response from %s\n", contactedContact.ID.String())
+				kademlia.network.routingTable.AddContact(*contactedContact)
+
+			case <-time.After(delayBeforeTimeOut * time.Second):
+				fmt.Println("Timeout.")
+
+			}
 		}
 
 		closestContacts.Sort()
@@ -60,7 +91,7 @@ func (kademlia *Kademlia) LookupContact(searchedKademliaID *KademliaID) Contact 
 	}
 
 	fmt.Printf("-----------------\nClosestContacts (%d/%d): %s\n", closestContacts.Len(), bucketSize, closestContacts.String())
-	return closestContacts.GetContacts(1)[0]
+	return closestContacts.GetContacts(bucketSize)
 
 }
 

@@ -45,6 +45,8 @@ func handleCommandLine(kademlia *Kademlia) {
 			ip, kademliaID := inputs[1], NewKademliaID(inputs[2])
 			fmt.Printf("Joining the network via %s (%s) ...\n", ip, kademliaID.String())
 			kademlia.network.routingTable.AddContact(NewContact(kademliaID, ip))
+			// No go routine because you don't necessarily want the node to respond
+			// other requests before he completes the join processus
 			kademlia.LookupContact(kademlia.network.routingTable.me.ID)
 			fmt.Print("Network joined.\n\n")
 			break
@@ -55,29 +57,23 @@ func handleCommandLine(kademlia *Kademlia) {
 			}
 			kademliaID := NewKademliaID(inputs[1])
 			fmt.Printf("Looking for %s ...\n", kademliaID.String())
-			contact := kademlia.LookupContact(kademliaID)
-			fmt.Printf("Found %s: %s.\n\n", kademliaID.String(), contact.String())
+			go kademlia.LookupContact(kademliaID)
 			break
 
 		case "ping":
 			if len(inputs) < 2 {
-				fmt.Println("Error: You need to provide an IP address and a KademliaID. \n     $ ping <ip> <kademlia_id>")
+				fmt.Println("Error: You need to provide an IP address and a KademliaID.\n     $ ping <ip> <kademlia_id>")
 			}
 			ip, kademliaID := inputs[1], NewKademliaID(inputs[2])
-			channel := make(chan bool)
-			defer close(channel)
 			fmt.Printf("Pinging %s (%s) ...\n", ip, kademliaID)
-			go kademlia.network.SendPingMessage(NewContact(kademliaID, ip), channel)
-			done := <-channel
-			if done {
-				fmt.Printf("Successfully pinged %s.\n\n", kademliaID)
-			} else {
-				fmt.Printf("Couldn't ping %s.\n\n", kademliaID)
-			}
+			go kademlia.Ping(NewContact(kademliaID, ip))
 			break
 
+		case "exit":
+			return
+
 		default:
-			fmt.Println("Invalid command, please try again.")
+			fmt.Println("Invalid command, please try again.\nValids commands are:\n     $ join <ip> <kademlia_id>\n     $ lookup <kademlia_id>\n     $ ping <ip> <kademlia_id>")
 			break
 
 		}
