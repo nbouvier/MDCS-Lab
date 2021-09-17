@@ -9,11 +9,13 @@ import (
 
 func main() {
 
+	var network Network
+
 	ip := GetOutboundIP()
 	kademlia := NewKademlia(ip.String())
-	fmt.Printf("IP address is %s\nKademliaID is %s\n\n", ip.String(), kademlia.network.routingTable.me.ID)
+	fmt.Printf("IP address is %s\nKademliaID is %s\n\n", ip.String(), kademlia.routingTable.me.ID)
 
-	go Listen(kademlia, 80)
+	go network.Listen(kademlia, 80)
 
 	handleCommandLine(kademlia)
 
@@ -44,10 +46,10 @@ func handleCommandLine(kademlia *Kademlia) {
 			}
 			ip, kademliaID := inputs[1], NewKademliaID(inputs[2])
 			fmt.Printf("Joining the network via %s (%s) ...\n", ip, kademliaID.String())
-			kademlia.network.routingTable.AddContact(NewContact(kademliaID, ip))
+			kademlia.routingTable.AddContact(NewContact(kademliaID, ip))
 			// No go routine because you don't necessarily want the node to respond
 			// other requests before he completes the join processus
-			kademlia.LookupContact(kademlia.network.routingTable.me.ID)
+			kademlia.LookupContact(kademlia.routingTable.me.ID)
 			fmt.Print("Network joined.\n\n")
 			break
 

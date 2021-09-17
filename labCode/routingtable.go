@@ -11,13 +11,16 @@ type RoutingTable struct {
 
 // NewRoutingTable returns a new instance of a RoutingTable
 func NewRoutingTable(me Contact) *RoutingTable {
-	routingTable := &RoutingTable{}
+	var routingTable RoutingTable
+
+	routingTable.me = me
 	for i := 0; i < IDLength*8; i++ {
 		routingTable.buckets[i] = newBucket()
 	}
-	routingTable.me = me
+
 	routingTable.AddContact(routingTable.me)
-	return routingTable
+
+	return &routingTable
 }
 
 // AddContact add a new contact to the correct Bucket

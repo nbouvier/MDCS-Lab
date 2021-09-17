@@ -6,28 +6,31 @@ import (
 )
 
 type Kademlia struct {
-	network *Network
+	routingTable *RoutingTable
 }
 
 // NewKademlia returns a new instance of Kademlia
 func NewKademlia(address string) *Kademlia {
-	kademlia := &Kademlia{}
-	kademlia.network = NewNetwork(NewContact(NewRandomKademliaID(), address))
-	return kademlia
+	var kademlia Kademlia
+
+	kademlia.routingTable = NewRoutingTable(NewContact(NewRandomKademliaID(), address))
+	// kademlia.network = NewNetwork()
+	return &kademlia
 }
 
 func (kademlia *Kademlia) Ping(contact Contact) {
 
+	var network Network
 	channel := make(chan bool)
 	defer close(channel)
 
-	go kademlia.network.SendPingMessage(&contact, channel)
+	go network.SendPingMessage(kademlia, &contact, channel)
 
 	select {
 
 	case <-channel:
 		fmt.Printf("Ping to %s (%s)succeed.\n", contact.Address, contact.ID.String())
-		kademlia.network.routingTable.AddContact(contact)
+		kademlia.routingTable.AddContact(contact)
 
 	case <-time.After(delayBeforeTimeOut * time.Second):
 		fmt.Printf("Ping to %s (%s) timed out.\n", contact.Address, contact.ID.String())
@@ -38,11 +41,12 @@ func (kademlia *Kademlia) Ping(contact Contact) {
 
 func (kademlia *Kademlia) LookupContact(searchedKademliaID *KademliaID) []Contact {
 
+	var network Network
 	var closestContacts, contactedContacts, notContactedContacts ContactCandidates
 	channel := make(chan *Contact)
 	defer close(channel)
 
-	contacts := kademlia.network.routingTable.FindClosestContacts(searchedKademliaID, bucketSize)
+	contacts := kademlia.routingTable.FindClosestContacts(searchedKademliaID, bucketSize)
 	closestContacts.Append(contacts)
 	closestContacts.Sort()
 	notContactedContacts.Append(contacts)
@@ -52,8 +56,8 @@ func (kademlia *Kademlia) LookupContact(searchedKademliaID *KademliaID) []Contac
 		contactsToContact := notContactedContacts.GetContacts(alpha)
 		responseWaitingNumber := len(contactsToContact)
 		for i := range contactsToContact {
-			if !contactsToContact[i].Equals(&kademlia.network.routingTable.me) {
-				go kademlia.network.SendFindContactMessage(searchedKademliaID, &contactsToContact[i], &closestContacts, channel)
+			if !contactsToContact[i].Equals(&kademlia.routingTable.me) {
+				go network.SendFindContactMessage(kademlia, searchedKademliaID, &contactsToContact[i], &closestContacts, channel)
 			} else {
 				responseWaitingNumber -= 1
 			}
@@ -69,7 +73,7 @@ func (kademlia *Kademlia) LookupContact(searchedKademliaID *KademliaID) []Contac
 
 			case contactedContact := <-channel:
 				fmt.Printf("Response from %s\n", contactedContact.ID.String())
-				kademlia.network.routingTable.AddContact(*contactedContact)
+				kademlia.routingTable.AddContact(*contactedContact)
 
 			case <-time.After(delayBeforeTimeOut * time.Second):
 				fmt.Println("Timeout.")

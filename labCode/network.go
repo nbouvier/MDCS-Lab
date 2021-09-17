@@ -17,17 +17,9 @@ const alpha = 3
 const delayBeforeTimeOut = 5
 
 type Network struct {
-	routingTable *RoutingTable
 }
 
-// NewNetwork returns a new instance of a Network
-func NewNetwork(me Contact) *Network {
-	network := &Network{}
-	network.routingTable = NewRoutingTable(me)
-	return network
-}
-
-func Listen(kademlia *Kademlia /* ip string, */, port int) {
+func (network *Network) Listen(kademlia *Kademlia, port int) {
 
 	portStr := ":" + strconv.Itoa(port)
 
@@ -60,10 +52,10 @@ func Listen(kademlia *Kademlia /* ip string, */, port int) {
 		case "PING":
 			kademliaID := NewKademliaID(message[1])
 
-			data := kademlia.network.routingTable.me.ID.String()
+			data := kademlia.routingTable.me.ID.String()
 			SendUDPResponse(data, addr, connection)
 
-			kademlia.network.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
+			kademlia.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
 
 			break
 
@@ -72,16 +64,16 @@ func Listen(kademlia *Kademlia /* ip string, */, port int) {
 
 		case "FIND_NODE":
 			kademliaID := NewKademliaID(message[1])
-			contacts := kademlia.network.routingTable.FindClosestContacts(kademliaID, bucketSize)
+			contacts := kademlia.routingTable.FindClosestContacts(kademliaID, bucketSize)
 
-			data := kademlia.network.routingTable.me.ID.String()
+			data := kademlia.routingTable.me.ID.String()
 			for _, contact := range contacts {
 				data += " " + contact.ID.String() + " " + contact.Address
 			}
 
 			SendUDPResponse(data, addr, connection)
 
-			kademlia.network.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
+			kademlia.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
 
 			break
 
@@ -119,9 +111,9 @@ func GetOutboundIP() net.IP {
 	return localAddr.IP
 }
 
-func (network *Network) SendPingMessage(target *Contact, channel chan bool) {
+func (network *Network) SendPingMessage(kademlia *Kademlia, target *Contact, channel chan bool) {
 
-	message := "PING " + network.routingTable.me.ID.String()
+	message := "PING " + kademlia.routingTable.me.ID.String()
 
 	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
 	_, err := network.SendUDPMessage(target, message)
@@ -135,9 +127,9 @@ func (network *Network) SendPingMessage(target *Contact, channel chan bool) {
 
 }
 
-func (network *Network) SendFindContactMessage(searchedKademliaID *KademliaID, target *Contact, closestContacts *ContactCandidates, channel chan *Contact) {
+func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchedKademliaID *KademliaID, target *Contact, closestContacts *ContactCandidates, channel chan *Contact) {
 
-	message := "FIND_NODE " + network.routingTable.me.ID.String() + " " + searchedKademliaID.String()
+	message := "FIND_NODE " + kademlia.routingTable.me.ID.String() + " " + searchedKademliaID.String()
 
 	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
 	reply, err := network.SendUDPMessage(target, message)
@@ -169,9 +161,9 @@ func (network *Network) SendFindDataMessage(hash string) {
 	// TODO
 }
 
-func (network *Network) SendStoreMessage(data []byte, target *Contact, channel chan bool) {
+func (network *Network) SendStoreMessage(kademlia *Kademlia, data []byte, target *Contact, channel chan bool) {
 
-	message := "STORE " + network.routingTable.me.ID.String() + " " + NewKademliaID(string(data)).String()
+	message := "STORE " + kademlia.routingTable.me.ID.String() + " " + NewKademliaID(string(data)).String()
 
 	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
 	_, err := network.SendUDPMessage(target, message)
