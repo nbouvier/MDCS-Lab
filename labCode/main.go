@@ -71,6 +71,15 @@ func handleCommandLine(kademlia *Kademlia) {
 			go kademlia.Ping(NewContact(kademliaID, ip))
 			break
 
+		case "store":
+			if len(inputs) < 1 {
+				fmt.Println("Error: You need to provide some data.\n     $ store <data>")
+			}
+			data := inputs[1]
+			fmt.Printf("Storing \"%s\" ...\n", data)
+			go kademlia.Store([]byte(data))
+			break
+
 		case "exit":
 			return
 

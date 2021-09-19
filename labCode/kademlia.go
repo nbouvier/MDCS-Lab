@@ -7,6 +7,7 @@ import (
 
 type Kademlia struct {
 	routingTable *RoutingTable
+	storage      *Storage
 }
 
 // NewKademlia returns a new instance of Kademlia
@@ -104,5 +105,28 @@ func (kademlia *Kademlia) LookupData(hash string) {
 }
 
 func (kademlia *Kademlia) Store(data []byte) {
-	// TODO
+
+	var network Network
+	channel := make(chan bool)
+	defer close(channel)
+
+	dataKademliaID := NewKademliaID(string(data))
+	// Only sending to closest contact
+	// Can be improved by sending to multiple contacts
+	// See Lookup to do so
+	contact := kademlia.LookupContact(dataKademliaID)[0]
+
+	go network.SendStoreMessage(kademlia, data, &contact, channel)
+
+	select {
+
+	case <-channel:
+		fmt.Printf("Store to %s (%s)succeed.\n", contact.Address, contact.ID.String())
+		kademlia.routingTable.AddContact(contact)
+
+	case <-time.After(delayBeforeTimeOut * time.Second):
+		fmt.Printf("Store to %s (%s) timed out.\n", contact.Address, contact.ID.String())
+
+	}
+
 }

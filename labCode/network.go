@@ -60,6 +60,15 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 			break
 
 		case "STORE":
+			kademliaID := NewKademliaID(message[1])
+
+			kademlia.storage.Put(message[2], message[3])
+
+			data := kademlia.routingTable.me.ID.String()
+			SendUDPResponse(data, addr, connection)
+
+			kademlia.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
+
 			break
 
 		case "FIND_NODE":
@@ -78,6 +87,13 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 			break
 
 		case "FIND_VALUE":
+			kademliaID := NewKademliaID(message[1])
+
+			data := kademlia.routingTable.me.ID.String() + " " + kademlia.storage.Get(message[2])
+			SendUDPResponse(data, addr, connection)
+
+			kademlia.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
+
 			break
 
 		default:
