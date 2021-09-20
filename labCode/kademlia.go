@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 	"time"
 )
 
@@ -11,11 +13,13 @@ type Kademlia struct {
 }
 
 // NewKademlia returns a new instance of Kademlia
-func NewKademlia(address string) *Kademlia {
+func NewKademlia(ip net.IP, port int) *Kademlia {
 	var kademlia Kademlia
 
-	kademlia.routingTable = NewRoutingTable(NewContact(NewRandomKademliaID(), address))
-	// kademlia.network = NewNetwork()
+	address := ip.String() + ":" + strconv.Itoa(listeningPort)
+	kademlia.routingTable = NewRoutingTable(NewContact(NewKademliaID(address), address))
+	kademlia.storage = NewStorage()
+
 	return &kademlia
 }
 
@@ -104,13 +108,13 @@ func (kademlia *Kademlia) LookupData(hash string) {
 	// TODO
 }
 
-func (kademlia *Kademlia) Store(data []byte) {
+func (kademlia *Kademlia) Store(data string) {
 
 	var network Network
 	channel := make(chan bool)
 	defer close(channel)
 
-	dataKademliaID := NewKademliaID(string(data))
+	dataKademliaID := NewKademliaID(data)
 	// Only sending to closest contact
 	// Can be improved by sending to multiple contacts
 	// See Lookup to do so
@@ -121,11 +125,11 @@ func (kademlia *Kademlia) Store(data []byte) {
 	select {
 
 	case <-channel:
-		fmt.Printf("Store to %s (%s)succeed.\n", contact.Address, contact.ID.String())
+		fmt.Printf("Stored \"%s\" (%s) to %s (%s) successfully.\n", data, dataKademliaID, contact.Address, contact.ID.String())
 		kademlia.routingTable.AddContact(contact)
 
 	case <-time.After(delayBeforeTimeOut * time.Second):
-		fmt.Printf("Store to %s (%s) timed out.\n", contact.Address, contact.ID.String())
+		fmt.Printf("Failed to store \"%s\" (%s) to %s (%s) (Timeout).\n", data, dataKademliaID, contact.Address, contact.ID.String())
 
 	}
 

@@ -11,9 +11,9 @@ func main() {
 
 	var network Network
 
-	ip := GetOutboundIP()
-	kademlia := NewKademlia(ip.String())
-	fmt.Printf("IP address is %s\nKademliaID is %s\n\n", ip.String(), kademlia.routingTable.me.ID)
+	ip, _ := GetOutboundIP()
+	kademlia := NewKademlia(ip, listeningPort)
+	fmt.Printf("IP address is %s\nKademliaID is %s\n\n", kademlia.routingTable.me.Address, kademlia.routingTable.me.ID)
 
 	go network.Listen(kademlia, 80)
 
@@ -41,12 +41,13 @@ func handleCommandLine(kademlia *Kademlia) {
 
 		case "join":
 			if len(inputs) < 3 {
-				fmt.Println("Error: You need to provide an ip address and a KademliaID.\n     $ join <ip_address> <kademlia_id>")
+				fmt.Println("Error: You need to provide an ip address and a KademliaID.\n     $ join <ip_address> <port>")
 				continue
 			}
-			ip, kademliaID := inputs[1], NewKademliaID(inputs[2])
-			fmt.Printf("Joining the network via %s (%s) ...\n", ip, kademliaID.String())
-			kademlia.routingTable.AddContact(NewContact(kademliaID, ip))
+			address := fmt.Sprintf("%s:%s", inputs[1], inputs[2])
+			kademliaID := NewKademliaID(address)
+			fmt.Printf("Joining the network via %s (%s) ...\n", address, kademliaID)
+			kademlia.routingTable.AddContact(NewContact(kademliaID, address))
 			// No go routine because you don't necessarily want the node to respond
 			// other requests before he completes the join processus
 			kademlia.LookupContact(kademlia.routingTable.me.ID)
@@ -57,8 +58,8 @@ func handleCommandLine(kademlia *Kademlia) {
 			if len(inputs) < 2 {
 				fmt.Println("Error: You need to provide a KademliaID. \n     $ lookup <kademlia_id>")
 			}
-			kademliaID := NewKademliaID(inputs[1])
-			fmt.Printf("Looking for %s ...\n", kademliaID.String())
+			kademliaID := HexToKademliaID(inputs[1])
+			fmt.Printf("Looking for %s ...\n", kademliaID)
 			go kademlia.LookupContact(kademliaID)
 			break
 
@@ -66,7 +67,7 @@ func handleCommandLine(kademlia *Kademlia) {
 			if len(inputs) < 2 {
 				fmt.Println("Error: You need to provide an IP address and a KademliaID.\n     $ ping <ip> <kademlia_id>")
 			}
-			ip, kademliaID := inputs[1], NewKademliaID(inputs[2])
+			ip, kademliaID := inputs[1], HexToKademliaID(inputs[2])
 			fmt.Printf("Pinging %s (%s) ...\n", ip, kademliaID)
 			go kademlia.Ping(NewContact(kademliaID, ip))
 			break
@@ -76,8 +77,8 @@ func handleCommandLine(kademlia *Kademlia) {
 				fmt.Println("Error: You need to provide some data.\n     $ store <data>")
 			}
 			data := inputs[1]
-			fmt.Printf("Storing \"%s\" ...\n", data)
-			go kademlia.Store([]byte(data))
+			fmt.Printf("Storing \"%s\" (%s) ...\n", data, NewKademliaID(data))
+			go kademlia.Store(data)
 			break
 
 		case "exit":

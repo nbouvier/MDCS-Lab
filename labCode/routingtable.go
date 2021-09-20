@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 const bucketSize = 20
 
 // RoutingTable definition
@@ -66,4 +68,18 @@ func (routingTable *RoutingTable) getBucketIndex(id *KademliaID) int {
 	}
 
 	return IDLength*8 - 1
+}
+
+func (routingTable *RoutingTable) String(showBuckets bool) string {
+	bucketsToString := ""
+	if showBuckets {
+		for i, bucket := range routingTable.buckets {
+			bucketsToString += fmt.Sprintf(`(%d)%s,`, i, bucket.String())
+		}
+	} else {
+		bucketsToString = "hidden"
+	}
+	bucketsToString = fmt.Sprintf(`(%d)[%s]`, len(routingTable.buckets), bucketsToString)
+
+	return fmt.Sprintf(`routingTable{me=%s,buckets=%s}`, routingTable.me.String(), bucketsToString)
 }

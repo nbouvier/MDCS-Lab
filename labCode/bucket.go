@@ -2,6 +2,7 @@ package main
 
 import (
 	"container/list"
+	"fmt"
 )
 
 // bucket definition
@@ -55,4 +56,14 @@ func (bucket *bucket) GetContactAndCalcDistance(target *KademliaID) []Contact {
 // Len return the size of the bucket
 func (bucket *bucket) Len() int {
 	return bucket.list.Len()
+}
+
+func (bucket *bucket) String() string {
+	listToString := ""
+	for e := bucket.list.Front(); e != nil; e = e.Next() {
+		contact := e.Value.(Contact)
+		listToString += (&contact).String() + ","
+	}
+
+	return fmt.Sprintf(`bucket{list=[%s]}`, listToString)
 }

@@ -36,7 +36,7 @@ func (contact *Contact) Equals(otherContact *Contact) bool {
 
 // String returns a simple string representation of a Contact
 func (contact *Contact) String() string {
-	return fmt.Sprintf(`contact("%s", "%s")`, contact.ID, contact.Address)
+	return fmt.Sprintf(`contact{id=%s,address=%s}`, contact.ID, contact.Address)
 }
 
 // ContactCandidates definition

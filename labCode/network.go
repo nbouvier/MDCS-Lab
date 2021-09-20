@@ -16,6 +16,10 @@ const alpha = 3
 // the static number of second before a RPC times out
 const delayBeforeTimeOut = 5
 
+// the static port number for UDP requests
+// should not stay static, but it's easier actually
+const listeningPort = 80
+
 type Network struct {
 }
 
@@ -50,29 +54,31 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 		switch message[0] {
 
 		case "PING":
-			kademliaID := NewKademliaID(message[1])
+			kademliaID := HexToKademliaID(message[1])
 
 			data := kademlia.routingTable.me.ID.String()
 			SendUDPResponse(data, addr, connection)
 
-			kademlia.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
+			address := fmt.Sprintf("%s:%d", addr.IP.String(), listeningPort)
+			kademlia.routingTable.AddContact(NewContact(kademliaID, address))
 
 			break
 
 		case "STORE":
-			kademliaID := NewKademliaID(message[1])
+			kademliaID := HexToKademliaID(message[1])
 
 			kademlia.storage.Put(message[2], message[3])
 
 			data := kademlia.routingTable.me.ID.String()
 			SendUDPResponse(data, addr, connection)
 
-			kademlia.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
+			address := fmt.Sprintf("%s:%d", addr.IP.String(), listeningPort)
+			kademlia.routingTable.AddContact(NewContact(kademliaID, address))
 
 			break
 
 		case "FIND_NODE":
-			kademliaID := NewKademliaID(message[1])
+			kademliaID := HexToKademliaID(message[1])
 			contacts := kademlia.routingTable.FindClosestContacts(kademliaID, bucketSize)
 
 			data := kademlia.routingTable.me.ID.String()
@@ -82,17 +88,19 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 
 			SendUDPResponse(data, addr, connection)
 
-			kademlia.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
+			address := fmt.Sprintf("%s:%d", addr.IP.String(), listeningPort)
+			kademlia.routingTable.AddContact(NewContact(kademliaID, address))
 
 			break
 
 		case "FIND_VALUE":
-			kademliaID := NewKademliaID(message[1])
+			kademliaID := HexToKademliaID(message[1])
 
 			data := kademlia.routingTable.me.ID.String() + " " + kademlia.storage.Get(message[2])
 			SendUDPResponse(data, addr, connection)
 
-			kademlia.routingTable.AddContact(NewContact(kademliaID, addr.IP.String()))
+			address := fmt.Sprintf("%s:%d", addr.IP.String(), listeningPort)
+			kademlia.routingTable.AddContact(NewContact(kademliaID, address))
 
 			break
 
@@ -115,7 +123,7 @@ func SendUDPResponse(stringData string, addr *net.UDPAddr, connection *net.UDPCo
 }
 
 // Get preferred outbound ip of this machine
-func GetOutboundIP() net.IP {
+func GetOutboundIP() (net.IP, int) {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		log.Fatal(err)
@@ -124,7 +132,7 @@ func GetOutboundIP() net.IP {
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
-	return localAddr.IP
+	return localAddr.IP, localAddr.Port
 }
 
 func (network *Network) SendPingMessage(kademlia *Kademlia, target *Contact, channel chan bool) {
@@ -158,7 +166,7 @@ func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchedKadem
 
 	replyArgs := strings.Split(reply, " ")[1:]
 	for i := 0; i < len(replyArgs); i += 2 {
-		newKademliaID := NewKademliaID(replyArgs[i])
+		newKademliaID := HexToKademliaID(replyArgs[i])
 		existingContact := closestContacts.Find(newKademliaID)
 		if existingContact == nil {
 			newContact := NewContact(newKademliaID, replyArgs[i+1])
@@ -177,9 +185,9 @@ func (network *Network) SendFindDataMessage(hash string) {
 	// TODO
 }
 
-func (network *Network) SendStoreMessage(kademlia *Kademlia, data []byte, target *Contact, channel chan bool) {
+func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target *Contact, channel chan bool) {
 
-	message := "STORE " + kademlia.routingTable.me.ID.String() + " " + NewKademliaID(string(data)).String()
+	message := "STORE " + kademlia.routingTable.me.ID.String() + " " + NewKademliaID(data).String() + " " + data
 
 	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
 	_, err := network.SendUDPMessage(target, message)
@@ -195,9 +203,7 @@ func (network *Network) SendStoreMessage(kademlia *Kademlia, data []byte, target
 
 func (network *Network) SendUDPMessage(contact *Contact, message string) (string, error) {
 
-	ip := contact.Address + ":80"
-
-	s, err := net.ResolveUDPAddr("udp4", ip)
+	s, err := net.ResolveUDPAddr("udp4", contact.Address)
 	c, err := net.DialUDP("udp4", nil, s)
 	if err != nil {
 		return "", err

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha1"
 	"encoding/hex"
 	"math/rand"
 	"time"
@@ -12,16 +13,31 @@ const IDLength = 20
 // type definition of a KademliaID
 type KademliaID [IDLength]byte
 
-// NewKademliaID returns a new instance of a KademliaID based on the string input
-func NewKademliaID(data string) *KademliaID {
-	decoded, _ := hex.DecodeString(data)
+// HexToKademliaID returns a new instance of a KademliaID based on the stringigied hex input
+func HexToKademliaID(data string) *KademliaID {
+	var kademlia KademliaID
 
-	newKademliaID := KademliaID{}
+	decoded, _ := hex.DecodeString(data)
 	for i := 0; i < IDLength; i++ {
-		newKademliaID[i] = decoded[i]
+		kademlia[i] = decoded[i]
 	}
 
-	return &newKademliaID
+	return &kademlia
+}
+
+// NewKademliaID returns a new instance of a KademliaID based on the string input
+func NewKademliaID(data string) *KademliaID {
+	var kademlia KademliaID
+
+	hasher := sha1.New()
+	hasher.Write([]byte(data))
+	sha1 := hasher.Sum(nil)
+
+	for i := 0; i < IDLength; i++ {
+		kademlia[i] = sha1[i]
+	}
+
+	return &kademlia
 }
 
 // NewRandomKademliaID returns a new instance of a random KademliaID,

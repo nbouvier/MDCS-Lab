@@ -1,22 +1,23 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 )
 
+type RoutingTableCase struct {
+	routingTable  *RoutingTable
+	expectedValue string
+}
+
 func TestRoutingTable(t *testing.T) {
-	rt := NewRoutingTable(NewContact(NewKademliaID("FFFFFFFF00000000000000000000000000000000"), "localhost:8000"))
+	cases := []RoutingTableCase{
+		{NewRoutingTable(NewContact(NewKademliaID("172.19.0.3:80"), "172.19.0.3:80")), "routingTable{me=contact{id=3d6064f8a61dda5a835ea34d9a4f3d0e10785fd8,address=172.19.0.3:80},buckets=(160)[hidden]}"},
+	}
 
-	rt.AddContact(NewContact(NewKademliaID("FFFFFFFF00000000000000000000000000000000"), "localhost:8001"))
-	rt.AddContact(NewContact(NewKademliaID("1111111100000000000000000000000000000000"), "localhost:8002"))
-	rt.AddContact(NewContact(NewKademliaID("1111111200000000000000000000000000000000"), "localhost:8002"))
-	rt.AddContact(NewContact(NewKademliaID("1111111300000000000000000000000000000000"), "localhost:8002"))
-	rt.AddContact(NewContact(NewKademliaID("1111111400000000000000000000000000000000"), "localhost:8002"))
-	rt.AddContact(NewContact(NewKademliaID("2111111400000000000000000000000000000000"), "localhost:8002"))
-
-	contacts := rt.FindClosestContacts(NewKademliaID("2111111400000000000000000000000000000000"), 20)
-	for i := range contacts {
-		fmt.Println(contacts[i].String())
+	for i, c := range cases {
+		if c.routingTable.String(false) != c.expectedValue {
+			t.Logf("Error in RoutingTable testing for test %d. Got %s instead of %s.", i, c.routingTable.String(false), c.expectedValue)
+			t.Fail()
+		}
 	}
 }
