@@ -37,9 +37,11 @@ func (kademlia *Kademlia) Ping(contact Contact) {
 	case <-channel:
 		fmt.Printf("Ping to %s (%s) succeed.\n", contact.Address, contact.ID.String())
 		kademlia.routingTable.AddContact(contact)
+		break
 
 	case <-time.After(delayBeforeTimeOut * time.Second):
 		fmt.Printf("Ping to %s (%s) timed out.\n", contact.Address, contact.ID.String())
+		break
 
 	}
 
@@ -58,7 +60,6 @@ func (kademlia *Kademlia) LookupContact(searchKademliaID *KademliaID) []Contact 
 	notContactedContacts.Append(contacts)
 
 	for notContactedContacts.Len() != 0 {
-		fmt.Println("-----------------")
 		contactsToContact := notContactedContacts.GetContacts(alpha)
 		responseWaitingNumber := len(contactsToContact)
 		for i := range contactsToContact {
@@ -78,29 +79,26 @@ func (kademlia *Kademlia) LookupContact(searchKademliaID *KademliaID) []Contact 
 			select {
 
 			case contactedContact := <-channel:
-				fmt.Printf("Response from %s\n", contactedContact.ID.String())
 				kademlia.routingTable.AddContact(*contactedContact)
+				break
 
 			case <-time.After(delayBeforeTimeOut * time.Second):
-				fmt.Println("Timeout.")
+				break
 
 			}
 		}
 
 		closestContacts.Sort()
-		fmt.Printf("\nClosestContacts:")
+
 		notContactedContacts.Empty()
 		for _, contact := range closestContacts.GetContacts(bucketSize) {
-			fmt.Printf("\nContact: %s", contact.String())
 			if contactedContacts.Find(contact.ID) == nil {
-				fmt.Printf(" -> Not contacted")
 				notContactedContacts.AppendOne(contact)
 			}
 		}
-		fmt.Println()
 	}
 
-	fmt.Printf("-----------------\nClosestContacts (%d/%d): %s\n", closestContacts.Len(), bucketSize, closestContacts.String())
+	fmt.Printf("ClosestContacts (%d/%d): %s\n", closestContacts.Len(), bucketSize, closestContacts.String())
 	return closestContacts.GetContacts(bucketSize)
 
 }
@@ -118,7 +116,6 @@ func (kademlia *Kademlia) LookupData(dataKademliaID *KademliaID) (string, []Cont
 	notContactedContacts.Append(contacts)
 
 	for notContactedContacts.Len() != 0 {
-		fmt.Println("-----------------")
 		contactsToContact := notContactedContacts.GetContacts(alpha)
 		responseWaitingNumber := len(contactsToContact)
 		for i := range contactsToContact {
@@ -140,7 +137,6 @@ func (kademlia *Kademlia) LookupData(dataKademliaID *KademliaID) (string, []Cont
 			case response := <-channel:
 				responseArgs := strings.Split(strings.TrimSpace(response), " ")
 				responseContact := NewContact(NewKademliaID(responseArgs[0]), responseArgs[0])
-				fmt.Printf("Response from %s (%s).\n", responseContact.Address, responseContact.ID)
 				kademlia.routingTable.AddContact(responseContact)
 				// Check if data was found
 				// /!\ Not waiting for other nodes to responde. Should we ?
@@ -148,27 +144,25 @@ func (kademlia *Kademlia) LookupData(dataKademliaID *KademliaID) (string, []Cont
 					fmt.Printf("Data found: %s.\n", responseArgs[1])
 					return responseArgs[1], nil
 				}
+				break
 
 			case <-time.After(delayBeforeTimeOut * time.Second):
-				fmt.Println("Timeout.")
+				break
 
 			}
 		}
 
 		closestContacts.Sort()
-		fmt.Printf("\nClosestContacts:")
+
 		notContactedContacts.Empty()
 		for _, contact := range closestContacts.GetContacts(bucketSize) {
-			fmt.Printf("\nContact: %s", contact.String())
 			if contactedContacts.Find(contact.ID) == nil {
-				fmt.Printf(" -> Not contacted")
 				notContactedContacts.AppendOne(contact)
 			}
 		}
-		fmt.Println()
 	}
 
-	fmt.Printf("-----------------\nClosestContacts (%d/%d): %s\n", closestContacts.Len(), bucketSize, closestContacts.String())
+	fmt.Printf("ClosestContacts (%d/%d): %s\n", closestContacts.Len(), bucketSize, closestContacts.String())
 	return "", closestContacts.GetContacts(bucketSize)
 
 }
@@ -192,9 +186,11 @@ func (kademlia *Kademlia) Store(data string) {
 	case <-channel:
 		fmt.Printf("Stored \"%s\" (%s) to %s (%s) successfully.\n", data, dataKademliaID, contact.Address, contact.ID.String())
 		kademlia.routingTable.AddContact(contact)
+		break
 
 	case <-time.After(delayBeforeTimeOut * time.Second):
 		fmt.Printf("Failed to store \"%s\" (%s) to %s (%s) (Timeout).\n", data, dataKademliaID, contact.Address, contact.ID.String())
+		break
 
 	}
 

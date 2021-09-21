@@ -44,60 +44,42 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 	rand.Seed(time.Now().Unix())
 
 	for {
+		var data string
+
 		n, addr, err := connection.ReadFromUDP(buffer)
 		if err != nil {
 			fmt.Println(err)
 		}
-		fmt.Printf("\n-> Received from %s: %s\n", addr, string(buffer[0:n]))
-		message := strings.Split(string(buffer), " ")
 
+		senderAddress := addr.IP.String() + ":" + strconv.Itoa(listeningPort)
+		message := strings.Split(string(buffer), " ")
+		senderKademliaID := HexToKademliaID(message[1])
+		unknownRPC := false
+		fmt.Printf("\n-> Received from %s (%s): %s\n", senderAddress, senderKademliaID, buffer[0:n])
 		switch message[0] {
 
 		case "PING":
-			kademliaID := HexToKademliaID(message[1])
-
-			data := kademlia.routingTable.me.ID.String()
-			SendUDPResponse(data, addr, connection)
-
-			address := fmt.Sprintf("%s:%d", addr.IP.String(), listeningPort)
-			kademlia.routingTable.AddContact(NewContact(kademliaID, address))
-
+			data = kademlia.routingTable.me.ID.String()
 			break
 
 		case "STORE":
-			kademliaID := HexToKademliaID(message[1])
-
 			kademlia.storage.Put(HexToKademliaID(message[2]), message[3])
-
-			data := kademlia.routingTable.me.ID.String()
-			SendUDPResponse(data, addr, connection)
-
-			address := fmt.Sprintf("%s:%d", addr.IP.String(), listeningPort)
-			kademlia.routingTable.AddContact(NewContact(kademliaID, address))
-
+			data = kademlia.routingTable.me.ID.String()
 			break
 
 		case "FIND_NODE":
-			kademliaID, lookedKademliaID := HexToKademliaID(message[1]), HexToKademliaID(message[2])
+			lookedKademliaID := HexToKademliaID(message[2])
 			contacts := kademlia.routingTable.FindClosestContacts(lookedKademliaID, bucketSize)
-
-			data := kademlia.routingTable.me.ID.String()
+			data = kademlia.routingTable.me.ID.String()
 			for _, contact := range contacts {
 				data += " " + contact.ID.String() + " " + contact.Address
 			}
-
-			SendUDPResponse(data, addr, connection)
-
-			address := fmt.Sprintf("%s:%d", addr.IP.String(), listeningPort)
-			kademlia.routingTable.AddContact(NewContact(kademliaID, address))
-
 			break
 
 		case "FIND_VALUE":
-			kademliaID, dataKademliaID := HexToKademliaID(message[1]), HexToKademliaID(message[2])
+			dataKademliaID := HexToKademliaID(message[2])
 			searchedData, exists := kademlia.storage.Get(dataKademliaID)
-
-			data := kademlia.routingTable.me.ID.String()
+			data = kademlia.routingTable.me.ID.String()
 			if !exists {
 				contacts := kademlia.routingTable.FindClosestContacts(dataKademliaID, bucketSize)
 				for _, contact := range contacts {
@@ -106,17 +88,17 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 			} else {
 				data += " " + searchedData
 			}
-
-			SendUDPResponse(data, addr, connection)
-
-			address := fmt.Sprintf("%s:%d", addr.IP.String(), listeningPort)
-			kademlia.routingTable.AddContact(NewContact(kademliaID, address))
-
 			break
 
 		default:
+			unknownRPC = true
 			break
 
+		}
+
+		if !unknownRPC {
+			SendUDPResponse(data, addr, connection)
+			kademlia.routingTable.AddContact(NewContact(senderKademliaID, senderAddress))
 		}
 	}
 
@@ -125,7 +107,7 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 // Send stringData as an UDP response to addr
 func SendUDPResponse(stringData string, addr *net.UDPAddr, connection *net.UDPConn) {
 	data := []byte(stringData)
-	fmt.Printf("-> Response to %s: %s\n\n", addr, stringData)
+	fmt.Printf("-> Respond to %s: %s\n\n", addr, stringData)
 	_, err := connection.WriteToUDP(data, addr)
 	if err != nil {
 		fmt.Println(err)
