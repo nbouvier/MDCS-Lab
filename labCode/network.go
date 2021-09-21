@@ -67,7 +67,7 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 		case "STORE":
 			kademliaID := HexToKademliaID(message[1])
 
-			kademlia.storage.Put(message[2], message[3])
+			kademlia.storage.Put(HexToKademliaID(message[2]), message[3])
 
 			data := kademlia.routingTable.me.ID.String()
 			SendUDPResponse(data, addr, connection)
@@ -78,8 +78,8 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 			break
 
 		case "FIND_NODE":
-			kademliaID := HexToKademliaID(message[1])
-			contacts := kademlia.routingTable.FindClosestContacts(kademliaID, bucketSize)
+			kademliaID, lookedKademliaID := HexToKademliaID(message[1]), HexToKademliaID(message[2])
+			contacts := kademlia.routingTable.FindClosestContacts(lookedKademliaID, bucketSize)
 
 			data := kademlia.routingTable.me.ID.String()
 			for _, contact := range contacts {
@@ -94,9 +94,19 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 			break
 
 		case "FIND_VALUE":
-			kademliaID := HexToKademliaID(message[1])
+			kademliaID, dataKademliaID := HexToKademliaID(message[1]), HexToKademliaID(message[2])
+			searchedData, exists := kademlia.storage.Get(dataKademliaID)
 
-			data := kademlia.routingTable.me.ID.String() + " " + kademlia.storage.Get(message[2])
+			data := kademlia.routingTable.me.ID.String()
+			if !exists {
+				contacts := kademlia.routingTable.FindClosestContacts(dataKademliaID, bucketSize)
+				for _, contact := range contacts {
+					data += " " + contact.ID.String() + " " + contact.Address
+				}
+			} else {
+				data += " " + searchedData
+			}
+
 			SendUDPResponse(data, addr, connection)
 
 			address := fmt.Sprintf("%s:%d", addr.IP.String(), listeningPort)
@@ -164,7 +174,7 @@ func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchedKadem
 		return
 	}
 
-	replyArgs := strings.Split(reply, " ")[1:]
+	replyArgs := strings.Split(strings.TrimSpace(reply), " ")[1:]
 	for i := 0; i < len(replyArgs); i += 2 {
 		newKademliaID := HexToKademliaID(replyArgs[i])
 		existingContact := closestContacts.Find(newKademliaID)
@@ -181,8 +191,41 @@ func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchedKadem
 
 }
 
-func (network *Network) SendFindDataMessage(hash string) {
-	// TODO
+func (network *Network) SendFindDataMessage(kademlia *Kademlia, dataKademliaID *KademliaID, target *Contact, closestContacts *ContactCandidates, channel chan string) {
+
+	message := "FIND_VALUE " + kademlia.routingTable.me.ID.String() + " " + dataKademliaID.String()
+
+	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
+	reply, err := network.SendUDPMessage(target, message)
+
+	if err != nil {
+		fmt.Println(err)
+		channel <- ""
+		return
+	}
+
+	replyArgs := strings.Split(strings.TrimSpace(reply), " ")[1:]
+	// Why does NewKademliaID(replyArgs[0]).Equals(dataKademliaID) = false ?!
+	// fmt.Printf("%s, %s, %s", replyArgs[0], NewKademliaID(replyArgs[0]), dataKademliaID)
+	if len(replyArgs) == 1 /*&& NewKademliaID(replyArgs[0]).Equals(dataKademliaID)*/ {
+		channel <- target.Address + " " + replyArgs[0]
+		return
+	}
+
+	for i := 0; i < len(replyArgs); i += 2 {
+		newKademliaID := HexToKademliaID(replyArgs[i])
+		existingContact := closestContacts.Find(newKademliaID)
+		if existingContact == nil {
+			newContact := NewContact(newKademliaID, replyArgs[i+1])
+			newContact.CalcDistance(dataKademliaID)
+			closestContacts.AppendOne(newContact)
+		} else {
+			existingContact.CalcDistance(dataKademliaID)
+		}
+	}
+
+	channel <- target.Address
+
 }
 
 func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target *Contact, channel chan bool) {

@@ -56,36 +56,51 @@ func handleCommandLine(kademlia *Kademlia) {
 
 		case "lookup":
 			if len(inputs) < 2 {
-				fmt.Println("Error: You need to provide a KademliaID. \n     $ lookup <kademlia_id>")
+				fmt.Println("Error: You need to provide a KademliaID. \n     $ lookup <ip> <port>")
 			}
-			kademliaID := HexToKademliaID(inputs[1])
-			fmt.Printf("Looking for %s ...\n", kademliaID)
+			address := fmt.Sprintf("%s:%s", inputs[1], inputs[2])
+			kademliaID := NewKademliaID(address)
+			fmt.Printf("Looking for %s (%s) ...\n", address, kademliaID)
 			go kademlia.LookupContact(kademliaID)
 			break
 
 		case "ping":
 			if len(inputs) < 2 {
-				fmt.Println("Error: You need to provide an IP address and a KademliaID.\n     $ ping <ip> <kademlia_id>")
+				fmt.Println("Error: You need to provide an IP address and a KademliaID.\n     $ ping <ip> <port>")
 			}
-			ip, kademliaID := inputs[1], HexToKademliaID(inputs[2])
-			fmt.Printf("Pinging %s (%s) ...\n", ip, kademliaID)
-			go kademlia.Ping(NewContact(kademliaID, ip))
+			address := fmt.Sprintf("%s:%s", inputs[1], inputs[2])
+			kademliaID := NewKademliaID(address)
+			fmt.Printf("Pinging %s (%s) ...\n", address, kademliaID)
+			go kademlia.Ping(NewContact(kademliaID, address))
 			break
 
-		case "store":
+		case "put":
 			if len(inputs) < 1 {
-				fmt.Println("Error: You need to provide some data.\n     $ store <data>")
+				fmt.Println("Error: You need to provide some data.\n     $ put <data>")
 			}
 			data := inputs[1]
 			fmt.Printf("Storing \"%s\" (%s) ...\n", data, NewKademliaID(data))
 			go kademlia.Store(data)
 			break
 
+		case "get":
+			if len(inputs) < 1 {
+				fmt.Println("Error: You need to provide a KademliaID.\n     $ get <kademlia_id>")
+			}
+			kademliaID := HexToKademliaID(inputs[1])
+			fmt.Printf("Looking for \"%s\" ...\n", kademliaID)
+			go kademlia.LookupData(kademliaID)
+			break
+
+		case "show-storage":
+			fmt.Println(kademlia.storage)
+			break
+
 		case "exit":
 			return
 
 		default:
-			fmt.Println("Invalid command, please try again.\nValids commands are:\n     $ join <ip> <kademlia_id>\n     $ lookup <kademlia_id>\n     $ ping <ip> <kademlia_id>")
+			fmt.Println("Invalid command, please try again.\nValids commands are:\n     $ join <ip> <port>\n     $ lookup <ip> <port>\n     $ ping <ip> <port>\n     $ put <data>\n     $ get <kademlia_id>\n     $ exit")
 			break
 
 		}

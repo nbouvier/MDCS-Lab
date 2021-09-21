@@ -6,10 +6,17 @@ import (
 
 func TestStorage(t *testing.T) {
 	storage := NewStorage()
-	storage.Put("a17c9aaa61e80a1bf71d0d850af4e5baa9800bbd", "data")
+	kademliaID := NewKademliaID("data")
+	storage.Put(kademliaID, "data")
 
-	if storage.Get("a17c9aaa61e80a1bf71d0d850af4e5baa9800bbd") != "data" {
-		t.Logf("Error in Storage testing. Got %s instead of %s.", storage.Get("a17c9aaa61e80a1bf71d0d850af4e5baa9800bbd"), "data")
+	data, exists := storage.Get(kademliaID)
+	if !exists {
+		t.Logf("Error in Storage testing. \"%s\" doesn't exists in storage.", data)
 		t.Fail()
+	} else {
+		if data != "data" {
+			t.Logf("Error in Storage testing. Got \"%s\" instead of \"%s\".", data, "data")
+			t.Fail()
+		}
 	}
 }
