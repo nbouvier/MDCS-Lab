@@ -48,8 +48,6 @@ func handleCommandLine(kademlia *Kademlia) {
 			kademliaID := NewKademliaID(address)
 			fmt.Printf("Joining the network via %s (%s) ...\n", address, kademliaID)
 			kademlia.routingTable.AddContact(NewContact(kademliaID, address))
-			// No go routine because you don't necessarily want the node to respond
-			// other requests before he completes the join processus
 			kademlia.LookupContact(kademlia.routingTable.me.ID)
 			fmt.Print("Network joined.\n\n")
 			break
@@ -61,7 +59,7 @@ func handleCommandLine(kademlia *Kademlia) {
 			address := fmt.Sprintf("%s:%s", inputs[1], inputs[2])
 			kademliaID := NewKademliaID(address)
 			fmt.Printf("Looking for %s (%s) ...\n", address, kademliaID)
-			go kademlia.LookupContact(kademliaID)
+			kademlia.LookupContact(kademliaID)
 			break
 
 		case "ping":
@@ -71,7 +69,7 @@ func handleCommandLine(kademlia *Kademlia) {
 			address := fmt.Sprintf("%s:%s", inputs[1], inputs[2])
 			kademliaID := NewKademliaID(address)
 			fmt.Printf("Pinging %s (%s) ...\n", address, kademliaID)
-			go kademlia.Ping(NewContact(kademliaID, address))
+			kademlia.Ping(NewContact(kademliaID, address))
 			break
 
 		case "put":
@@ -80,7 +78,7 @@ func handleCommandLine(kademlia *Kademlia) {
 			}
 			data := inputs[1]
 			fmt.Printf("Storing \"%s\" (%s) ...\n", data, NewKademliaID(data))
-			go kademlia.Store(data)
+			kademlia.Store(data)
 			break
 
 		case "get":
@@ -89,7 +87,7 @@ func handleCommandLine(kademlia *Kademlia) {
 			}
 			kademliaID := HexToKademliaID(inputs[1])
 			fmt.Printf("Looking for \"%s\" ...\n", kademliaID)
-			go kademlia.LookupData(kademliaID)
+			kademlia.LookupData(kademliaID)
 			break
 
 		case "show-storage":
