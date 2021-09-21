@@ -17,7 +17,7 @@ type Kademlia struct {
 func NewKademlia(ip net.IP, port int) *Kademlia {
 	var kademlia Kademlia
 
-	address := ip.String() + ":" + strconv.Itoa(listeningPort)
+	address := ip.String() + ":" + strconv.Itoa(port)
 	kademlia.routingTable = NewRoutingTable(NewContact(NewKademliaID(address), address))
 	kademlia.storage = NewStorage()
 
@@ -34,15 +34,17 @@ func (kademlia *Kademlia) Ping(contact Contact) {
 
 	select {
 
-	case <-channel:
-		fmt.Printf("Ping to %s (%s) succeed.\n", contact.Address, contact.ID.String())
-		kademlia.routingTable.AddContact(contact)
+	case result := <-channel:
+		if result {
+			fmt.Printf("Ping to %s (%s) succeed.\n", contact.Address, contact.ID)
+			kademlia.routingTable.AddContact(contact)
+		} else {
+			fmt.Printf("Failed to ping %s (%s).\n", contact.Address, contact.ID)
+		}
 		break
 
 	case <-time.After(delayBeforeTimeOut * time.Second):
-		fmt.Printf("Ping to %s (%s) timed out.\n", contact.Address, contact.ID.String())
-		break
-
+		fmt.Printf("Ping to %s (%s) timed out.\n", contact.Address, contact.ID)
 	}
 
 }
@@ -162,7 +164,7 @@ func (kademlia *Kademlia) LookupData(dataKademliaID *KademliaID) (string, []Cont
 		}
 	}
 
-	fmt.Printf("ClosestContacts (%d/%d): %s\n", closestContacts.Len(), bucketSize, closestContacts.String())
+	fmt.Printf("Data not found.\nClosestContacts (%d/%d): %s\n", closestContacts.Len(), bucketSize, closestContacts.String())
 	return "", closestContacts.GetContacts(bucketSize)
 
 }
@@ -183,13 +185,17 @@ func (kademlia *Kademlia) Store(data string) {
 
 	select {
 
-	case <-channel:
-		fmt.Printf("Stored \"%s\" (%s) to %s (%s) successfully.\n", data, dataKademliaID, contact.Address, contact.ID.String())
-		kademlia.routingTable.AddContact(contact)
+	case result := <-channel:
+		if result {
+			fmt.Printf("Stored \"%s\" (%s) to %s (%s) successfully.\n", data, dataKademliaID, contact.Address, contact.ID)
+			kademlia.routingTable.AddContact(contact)
+		} else {
+			fmt.Printf("Failed to store \"%s\" (%s) to %s (%s).\n", data, dataKademliaID, contact.Address, contact.ID)
+		}
 		break
 
 	case <-time.After(delayBeforeTimeOut * time.Second):
-		fmt.Printf("Failed to store \"%s\" (%s) to %s (%s) (Timeout).\n", data, dataKademliaID, contact.Address, contact.ID.String())
+		fmt.Printf("Failed to store \"%s\" (%s) to %s (%s) (Timeout).\n", data, dataKademliaID, contact.Address, contact.ID)
 		break
 
 	}

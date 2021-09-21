@@ -2,30 +2,69 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func main() {
 
 	var network Network
 
-	ip, _ := GetOutboundIP()
-	kademlia := NewKademlia(ip, listeningPort)
-	fmt.Printf("IP address is %s\nKademliaID is %s\n\n", kademlia.routingTable.me.Address, kademlia.routingTable.me.ID)
+	ip, port := GetOutboundIP()
+	if len(os.Args) > 2 && os.Args[2] == "entry" {
+		port = kademliaEntryListeningPort
+	}
+	kademlia := NewKademlia(ip, port)
+	fmt.Printf("IP address is %s\nKademliaID is %s\n", kademlia.routingTable.me.Address, kademlia.routingTable.me.ID)
 
-	go network.Listen(kademlia, 80)
+	go network.Listen(kademlia, port)
 
-	handleCommandLine(kademlia)
+	if len(os.Args) > 2 && os.Args[1] == "auto" {
+		idle()
+	} else if len(os.Args) > 1 && os.Args[1] == "auto" {
+		autoConnect(kademlia)
+		idle()
+	} else {
+		handleCommandLine(kademlia)
+	}
 
+}
+
+func autoConnect(kademlia *Kademlia) {
+	var addr *net.IPAddr
+
+	err := errors.New("Looking for kademliaEntry")
+	fmt.Println("Looking for kademliaEntry...")
+	for err != nil {
+		addr, err = net.ResolveIPAddr("ip4:icmp", "kademliaEntry")
+	}
+	fmt.Printf("KademliaEntry found\n\n.")
+
+	address := addr.IP.String() + ":" + strconv.Itoa(kademliaEntryListeningPort)
+	kademliaID := NewKademliaID(address)
+	fmt.Printf("Joining the network via %s (%s) ...\n", address, kademliaID)
+	kademlia.routingTable.AddContact(NewContact(kademliaID, address))
+	kademlia.LookupContact(kademlia.routingTable.me.ID)
+	fmt.Printf("Network joined.\n")
+}
+
+func idle() {
+	// Just looping around to keep the program alive
+	for {
+		time.Sleep(60 * time.Second)
+	}
 }
 
 func handleCommandLine(kademlia *Kademlia) {
 
 	for {
 
-		fmt.Print("$ ")
+		fmt.Print("\n$ ")
 
 		reader := bufio.NewReader(os.Stdin)
 		// ReadString will block until the delimiter is entered
@@ -49,7 +88,7 @@ func handleCommandLine(kademlia *Kademlia) {
 			fmt.Printf("Joining the network via %s (%s) ...\n", address, kademliaID)
 			kademlia.routingTable.AddContact(NewContact(kademliaID, address))
 			kademlia.LookupContact(kademlia.routingTable.me.ID)
-			fmt.Print("Network joined.\n\n")
+			fmt.Printf("Network joined.\n")
 			break
 
 		case "lookup":

@@ -16,9 +16,8 @@ const alpha = 3
 // the static number of second before a RPC times out
 const delayBeforeTimeOut = 5
 
-// the static port number for UDP requests
-// should not stay static, but it's easier actually
-const listeningPort = 80
+// the static listening port number of the kademliaEntry node
+const kademliaEntryListeningPort = 80
 
 type Network struct {
 }
@@ -38,39 +37,36 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 		fmt.Println(err)
 		return
 	}
-
 	defer connection.Close()
+
 	buffer := make([]byte, 1024)
 	rand.Seed(time.Now().Unix())
 
 	for {
-		var data string
-
 		n, addr, err := connection.ReadFromUDP(buffer)
 		if err != nil {
 			fmt.Println(err)
 		}
 
-		senderAddress := addr.IP.String() + ":" + strconv.Itoa(listeningPort)
 		message := strings.Split(string(buffer), " ")
-		senderKademliaID := HexToKademliaID(message[1])
+		senderAddress := message[1]
+		senderKademliaID := NewKademliaID(senderAddress)
+		data := kademlia.routingTable.me.Address
 		unknownRPC := false
-		fmt.Printf("\n-> Received from %s (%s): %s\n", senderAddress, senderKademliaID, buffer[0:n])
+
+		fmt.Printf("\nReceived from %s (%s): %s\n", senderAddress, senderKademliaID, buffer[0:n])
 		switch message[0] {
 
 		case "PING":
-			data = kademlia.routingTable.me.ID.String()
 			break
 
 		case "STORE":
 			kademlia.storage.Put(HexToKademliaID(message[2]), message[3])
-			data = kademlia.routingTable.me.ID.String()
 			break
 
 		case "FIND_NODE":
 			lookedKademliaID := HexToKademliaID(message[2])
 			contacts := kademlia.routingTable.FindClosestContacts(lookedKademliaID, bucketSize)
-			data = kademlia.routingTable.me.ID.String()
 			for _, contact := range contacts {
 				data += " " + contact.ID.String() + " " + contact.Address
 			}
@@ -79,7 +75,6 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 		case "FIND_VALUE":
 			dataKademliaID := HexToKademliaID(message[2])
 			searchedData, exists := kademlia.storage.Get(dataKademliaID)
-			data = kademlia.routingTable.me.ID.String()
 			if !exists {
 				contacts := kademlia.routingTable.FindClosestContacts(dataKademliaID, bucketSize)
 				for _, contact := range contacts {
@@ -97,21 +92,15 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 		}
 
 		if !unknownRPC {
-			SendUDPResponse(data, addr, connection)
-			kademlia.routingTable.AddContact(NewContact(senderKademliaID, senderAddress))
+			err = SendUDPResponse(data, addr, connection)
+			if err == nil {
+				kademlia.routingTable.AddContact(NewContact(senderKademliaID, senderAddress))
+			} else {
+				fmt.Printf("Error while responding to %s (%s).\n%s\n", senderAddress, senderKademliaID, err)
+			}
 		}
 	}
 
-}
-
-// Send stringData as an UDP response to addr
-func SendUDPResponse(stringData string, addr *net.UDPAddr, connection *net.UDPConn) {
-	data := []byte(stringData)
-	fmt.Printf("-> Respond to %s: %s\n\n", addr, stringData)
-	_, err := connection.WriteToUDP(data, addr)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
 
 // Get preferred outbound ip of this machine
@@ -129,29 +118,30 @@ func GetOutboundIP() (net.IP, int) {
 
 func (network *Network) SendPingMessage(kademlia *Kademlia, target *Contact, channel chan bool) {
 
-	message := "PING " + kademlia.routingTable.me.ID.String()
+	message := "PING " + kademlia.routingTable.me.Address
 
-	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
+	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
 	_, err := network.SendUDPMessage(target, message)
 
-	if err == nil {
-		channel <- true
-	} else {
+	if err != nil {
+		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
 		channel <- false
-		fmt.Println(err)
+		return
 	}
+
+	channel <- true
 
 }
 
 func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchedKademliaID *KademliaID, target *Contact, closestContacts *ContactCandidates, channel chan *Contact) {
 
-	message := "FIND_NODE " + kademlia.routingTable.me.ID.String() + " " + searchedKademliaID.String()
+	message := "FIND_NODE " + kademlia.routingTable.me.Address + " " + searchedKademliaID.String()
 
-	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
+	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
 	reply, err := network.SendUDPMessage(target, message)
 
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
 		channel <- nil
 		return
 	}
@@ -175,13 +165,13 @@ func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchedKadem
 
 func (network *Network) SendFindDataMessage(kademlia *Kademlia, dataKademliaID *KademliaID, target *Contact, closestContacts *ContactCandidates, channel chan string) {
 
-	message := "FIND_VALUE " + kademlia.routingTable.me.ID.String() + " " + dataKademliaID.String()
+	message := "FIND_VALUE " + kademlia.routingTable.me.Address + " " + dataKademliaID.String()
 
-	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
+	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
 	reply, err := network.SendUDPMessage(target, message)
 
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
 		channel <- ""
 		return
 	}
@@ -212,23 +202,28 @@ func (network *Network) SendFindDataMessage(kademlia *Kademlia, dataKademliaID *
 
 func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target *Contact, channel chan bool) {
 
-	message := "STORE " + kademlia.routingTable.me.ID.String() + " " + NewKademliaID(data).String() + " " + data
+	message := "STORE " + kademlia.routingTable.me.Address + " " + NewKademliaID(data).String() + " " + data
 
-	fmt.Printf("Sending to %s: %s\n", target.ID.String(), message)
+	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
 	_, err := network.SendUDPMessage(target, message)
 
-	if err == nil {
-		channel <- true
-	} else {
+	if err != nil {
+		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
 		channel <- false
-		fmt.Println(err)
+		return
 	}
+
+	channel <- true
 
 }
 
 func (network *Network) SendUDPMessage(contact *Contact, message string) (string, error) {
 
 	s, err := net.ResolveUDPAddr("udp4", contact.Address)
+	if err != nil {
+		return "", err
+	}
+
 	c, err := net.DialUDP("udp4", nil, s)
 	if err != nil {
 		return "", err
@@ -248,4 +243,13 @@ func (network *Network) SendUDPMessage(contact *Contact, message string) (string
 
 	return string(buffer[0:n]), nil
 
+}
+
+// Send stringData as an UDP response to addr
+func SendUDPResponse(stringData string, addr *net.UDPAddr, connection *net.UDPConn) error {
+	fmt.Printf("Respond to %s: %s\n\n", addr, stringData)
+	data := []byte(stringData)
+	_, err := connection.WriteToUDP(data, addr)
+
+	return err
 }
