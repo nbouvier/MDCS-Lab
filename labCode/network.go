@@ -65,10 +65,10 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 			break
 
 		case "FIND_NODE":
-			lookedKademliaID := HexToKademliaID(message[2])
+			lookedKademliaID := NewKademliaID(message[2])
 			contacts := kademlia.routingTable.FindClosestContacts(lookedKademliaID, bucketSize)
 			for _, contact := range contacts {
-				data += " " + contact.ID.String() + " " + contact.Address
+				data += " " + contact.Address
 			}
 			break
 
@@ -78,7 +78,7 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 			if !exists {
 				contacts := kademlia.routingTable.FindClosestContacts(dataKademliaID, bucketSize)
 				for _, contact := range contacts {
-					data += " " + contact.ID.String() + " " + contact.Address
+					data += " " + contact.Address
 				}
 			} else {
 				data += " " + searchedData
@@ -133,9 +133,9 @@ func (network *Network) SendPingMessage(kademlia *Kademlia, target *Contact, cha
 
 }
 
-func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchedKademliaID *KademliaID, target *Contact, closestContacts *ContactCandidates, channel chan *Contact) {
+func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchContact *Contact, target *Contact, closestContacts *ContactCandidates, channel chan *Contact) {
 
-	message := "FIND_NODE " + kademlia.routingTable.me.Address + " " + searchedKademliaID.String()
+	message := "FIND_NODE " + kademlia.routingTable.me.Address + " " + searchContact.Address
 
 	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
 	reply, err := network.SendUDPMessage(target, message)
@@ -147,15 +147,16 @@ func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchedKadem
 	}
 
 	replyArgs := strings.Split(strings.TrimSpace(reply), " ")[1:]
-	for i := 0; i < len(replyArgs); i += 2 {
-		newKademliaID := HexToKademliaID(replyArgs[i])
+	for i := 0; i < len(replyArgs); i++ {
+		newAddress := replyArgs[i]
+		newKademliaID := NewKademliaID(newAddress)
 		existingContact := closestContacts.Find(newKademliaID)
 		if existingContact == nil {
-			newContact := NewContact(newKademliaID, replyArgs[i+1])
-			newContact.CalcDistance(searchedKademliaID)
+			newContact := NewContact(newKademliaID, newAddress)
+			newContact.CalcDistance(searchContact.ID)
 			closestContacts.AppendOne(newContact)
 		} else {
-			existingContact.CalcDistance(searchedKademliaID)
+			existingContact.CalcDistance(searchContact.ID)
 		}
 	}
 
@@ -184,11 +185,12 @@ func (network *Network) SendFindDataMessage(kademlia *Kademlia, dataKademliaID *
 		return
 	}
 
-	for i := 0; i < len(replyArgs); i += 2 {
-		newKademliaID := HexToKademliaID(replyArgs[i])
+	for i := 0; i < len(replyArgs); i++ {
+		newAddress := replyArgs[i]
+		newKademliaID := NewKademliaID(newAddress)
 		existingContact := closestContacts.Find(newKademliaID)
 		if existingContact == nil {
-			newContact := NewContact(newKademliaID, replyArgs[i+1])
+			newContact := NewContact(newKademliaID, newAddress)
 			newContact.CalcDistance(dataKademliaID)
 			closestContacts.AppendOne(newContact)
 		} else {

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -45,18 +46,21 @@ func autoConnect(kademlia *Kademlia) {
 	}
 	fmt.Printf("KademliaEntry found\n\n.")
 
+	rand.Seed(time.Now().UnixNano())
+	time.Sleep(time.Second * time.Duration(rand.Intn(60)))
+
 	address := addr.IP.String() + ":" + strconv.Itoa(kademliaEntryListeningPort)
 	kademliaID := NewKademliaID(address)
 	fmt.Printf("Joining the network via %s (%s) ...\n", address, kademliaID)
 	kademlia.routingTable.AddContact(NewContact(kademliaID, address))
-	kademlia.LookupContact(kademlia.routingTable.me.ID)
+	kademlia.LookupContact(kademlia.routingTable.me)
 	fmt.Printf("Network joined.\n")
 }
 
 func idle() {
 	// Just looping around to keep the program alive
 	for {
-		time.Sleep(60 * time.Second)
+		time.Sleep(30 * time.Second)
 	}
 }
 
@@ -87,7 +91,7 @@ func handleCommandLine(kademlia *Kademlia) {
 			kademliaID := NewKademliaID(address)
 			fmt.Printf("Joining the network via %s (%s) ...\n", address, kademliaID)
 			kademlia.routingTable.AddContact(NewContact(kademliaID, address))
-			kademlia.LookupContact(kademlia.routingTable.me.ID)
+			kademlia.LookupContact(kademlia.routingTable.me)
 			fmt.Printf("Network joined.\n")
 			break
 
@@ -98,7 +102,12 @@ func handleCommandLine(kademlia *Kademlia) {
 			address := fmt.Sprintf("%s:%s", inputs[1], inputs[2])
 			kademliaID := NewKademliaID(address)
 			fmt.Printf("Looking for %s (%s) ...\n", address, kademliaID)
-			kademlia.LookupContact(kademliaID)
+			contacts := kademlia.LookupContact(NewContact(kademliaID, address))
+			stringifiedContacts := ""
+			for _, contact := range contacts {
+				stringifiedContacts += contact.String()
+			}
+			fmt.Printf("Closest contacts for %s (%s): [%s]\n", address, kademliaID, stringifiedContacts)
 			break
 
 		case "ping":
@@ -126,7 +135,28 @@ func handleCommandLine(kademlia *Kademlia) {
 			}
 			kademliaID := HexToKademliaID(inputs[1])
 			fmt.Printf("Looking for \"%s\" ...\n", kademliaID)
-			kademlia.LookupData(kademliaID)
+			data, contacts := kademlia.LookupData(kademliaID)
+			if contacts != nil {
+				stringifiedContacts := ""
+				for _, contact := range contacts {
+					stringifiedContacts += contact.String()
+				}
+				fmt.Printf("Data not found.\nClosest contacts for %s: [%s]\n", kademliaID, stringifiedContacts)
+			} else {
+				fmt.Printf("Data found: %s.\n", data)
+			}
+			break
+
+		case "show-routing-table":
+			if len(inputs) < 1 {
+				fmt.Println("Error: You need to provide a boolean for hidding buckets.\n     $ get <buckets_hidding>")
+			}
+			bucketsHidding, err := strconv.ParseBool(string(input[1]))
+			if err == nil {
+				fmt.Println(kademlia.routingTable.String(bucketsHidding))
+			} else {
+				fmt.Printf("%s found, boolean expected.\n", string(input[1]))
+			}
 			break
 
 		case "show-storage":
