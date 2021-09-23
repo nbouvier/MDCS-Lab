@@ -118,15 +118,13 @@ func (kademlia *Kademlia) LookupData(dataKademliaID *KademliaID) (string, []Cont
 	closestContacts.Sort()
 	notContactedContacts.Append(contacts)
 
+	data := ""
+	dataFound := false
 	for notContactedContacts.Len() != 0 {
 		contactsToContact := notContactedContacts.GetContacts(alpha)
 		responseWaitingNumber := len(contactsToContact)
 		for i := range contactsToContact {
-			if !contactsToContact[i].Equals(&kademlia.routingTable.me) {
-				go network.SendFindDataMessage(kademlia, dataKademliaID, &contactsToContact[i], &closestContacts, channel)
-			} else {
-				responseWaitingNumber -= 1
-			}
+			go network.SendFindDataMessage(kademlia, dataKademliaID, &contactsToContact[i], &closestContacts, channel)
 			contactedContacts.AppendOne(contactsToContact[i])
 		}
 
@@ -143,9 +141,10 @@ func (kademlia *Kademlia) LookupData(dataKademliaID *KademliaID) (string, []Cont
 					responseContact := NewContact(NewKademliaID(responseArgs[0]), responseArgs[0])
 					kademlia.routingTable.AddContact(responseContact)
 					// Check if data was found
-					// /!\ Not waiting for other nodes to responde. Should we ?
+					// Still waiting for other contacted nodes to respond
 					if len(responseArgs) == 2 /*&& NewKademliaID(responseArgs[1]).Equals(dataKademliaID)*/ {
-						return responseArgs[1], nil
+						data = responseArgs[1]
+						dataFound = true
 					}
 				}
 				break
@@ -154,6 +153,10 @@ func (kademlia *Kademlia) LookupData(dataKademliaID *KademliaID) (string, []Cont
 				break
 
 			}
+		}
+
+		if dataFound {
+			return data, nil
 		}
 
 		closestContacts.Sort()
