@@ -3,11 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"net"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // the static number of simultaneous asynchronous sends
@@ -15,6 +13,12 @@ const alpha = 3
 
 // the static number of second before a RPC times out
 const delayBeforeTimeOut = 5
+
+// the static number of tries to send an UDP message
+// const udpTryNumber = 3
+
+// the static number of millisecond before each UDP tries
+// const delayBetweenUDPTries = 500
 
 // the static listening port number of the kademliaEntry node
 const kademliaEntryListeningPort = 80
@@ -40,8 +44,6 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 	defer connection.Close()
 
 	buffer := make([]byte, 1024)
-	rand.Seed(time.Now().Unix())
-
 	for {
 		n, addr, err := connection.ReadFromUDP(buffer)
 		if err != nil {
@@ -178,9 +180,7 @@ func (network *Network) SendFindDataMessage(kademlia *Kademlia, dataKademliaID *
 	}
 
 	replyArgs := strings.Split(strings.TrimSpace(reply), " ")[1:]
-	// Why does NewKademliaID(replyArgs[0]).Equals(dataKademliaID) = false ?!
-	// fmt.Printf("%s, %s, %s", replyArgs[0], NewKademliaID(replyArgs[0]), dataKademliaID)
-	if len(replyArgs) == 1 /*&& NewKademliaID(replyArgs[0]).Equals(dataKademliaID)*/ {
+	if len(replyArgs) == 1 {
 		channel <- target.Address + " " + replyArgs[0]
 		return
 	}
@@ -234,6 +234,7 @@ func (network *Network) SendUDPMessage(contact *Contact, message string) (string
 
 	_, err = c.Write([]byte(message))
 	if err != nil {
+		fmt.Printf("Error 3 with %s\n", []byte(message))
 		return "", err
 	}
 
@@ -246,6 +247,61 @@ func (network *Network) SendUDPMessage(contact *Contact, message string) (string
 	return string(buffer[0:n]), nil
 
 }
+
+/*
+func (network *Network) SendUDPMessage(contact *Contact, message string) (string, error) {
+
+	var c *net.UDPConn
+
+	i := 0
+	err := errors.New("Enter loop.")
+	for i < udpTryNumber && err != nil {
+
+		i++
+		err = nil
+
+		s, err := net.ResolveUDPAddr("udp4", contact.Address)
+		if err != nil {
+			fmt.Printf("Failed at iteration %d.\n", i)
+			time.Sleep(delayBetweenUDPTries * time.Millisecond)
+			continue
+		}
+
+		c, err = net.DialUDP("udp4", nil, s)
+		if err != nil {
+			fmt.Printf("Failed at iteration %d.\n", i)
+			time.Sleep(delayBetweenUDPTries * time.Millisecond)
+			continue
+		}
+		defer c.close()
+
+		_, err = c.Write([]byte(message))
+		if err != nil {
+			fmt.Printf("Failed at iteration %d.\n", i)
+			time.Sleep(delayBetweenUDPTries * time.Millisecond)
+			continue
+		}
+
+	}
+
+	if i == 3 {
+		fmt.Printf("Failed 3 times in a raw.\n")
+		return "", err
+	} else {
+
+		buffer := make([]byte, 1024)
+		n, _, err := c.ReadFromUDP(buffer)
+		if err != nil {
+			fmt.Printf("Failed to read UDP response.\n")
+			return "", err
+		}
+
+		return string(buffer[0:n]), nil
+
+	}
+
+}
+*/
 
 // Send stringData as an UDP response to addr
 func SendUDPResponse(stringData string, addr *net.UDPAddr, connection *net.UDPConn) error {

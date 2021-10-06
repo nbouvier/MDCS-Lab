@@ -17,7 +17,7 @@ func main() {
 	var network Network
 
 	ip, port := GetOutboundIP()
-	if len(os.Args) > 2 && os.Args[2] == "entry" {
+	if len(os.Args) > 1 && os.Args[1] == "entry" {
 		port = kademliaEntryListeningPort
 	}
 	kademlia := NewKademlia(ip, port)
@@ -25,7 +25,7 @@ func main() {
 
 	go network.Listen(kademlia, port)
 
-	if len(os.Args) > 2 && os.Args[1] == "auto" {
+	if len(os.Args) > 1 && os.Args[1] == "entry" {
 		idle()
 	} else if len(os.Args) > 1 && os.Args[1] == "auto" {
 		autoConnect(kademlia)
@@ -47,7 +47,7 @@ func autoConnect(kademlia *Kademlia) {
 	fmt.Printf("KademliaEntry found\n\n.")
 
 	rand.Seed(time.Now().UnixNano())
-	time.Sleep(time.Second * time.Duration(rand.Intn(60)))
+	time.Sleep(time.Second*time.Duration(rand.Intn(60)) + time.Second*time.Duration(10))
 
 	address := addr.IP.String() + ":" + strconv.Itoa(kademliaEntryListeningPort)
 	kademliaID := NewKademliaID(address)

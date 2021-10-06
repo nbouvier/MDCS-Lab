@@ -87,6 +87,7 @@ func (kademlia *Kademlia) LookupContact(searchedContact Contact) []Contact {
 				break
 
 			case <-time.After(delayBeforeTimeOut * time.Second):
+				fmt.Println("Timeout.")
 				break
 
 			}
