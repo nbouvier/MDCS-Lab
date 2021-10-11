@@ -96,7 +96,7 @@ func handleCommandLine(kademlia *Kademlia) {
 			break
 
 		case "lookup":
-			if len(inputs) < 2 {
+			if len(inputs) < 3 {
 				fmt.Println("Error: You need to provide a KademliaID. \n     $ lookup <ip> <port>")
 			}
 			address := fmt.Sprintf("%s:%s", inputs[1], inputs[2])
@@ -111,7 +111,7 @@ func handleCommandLine(kademlia *Kademlia) {
 			break
 
 		case "ping":
-			if len(inputs) < 2 {
+			if len(inputs) < 3 {
 				fmt.Println("Error: You need to provide an IP address and a KademliaID.\n     $ ping <ip> <port>")
 			}
 			address := fmt.Sprintf("%s:%s", inputs[1], inputs[2])
@@ -149,7 +149,7 @@ func handleCommandLine(kademlia *Kademlia) {
 
 		case "show-routing-table":
 			if len(inputs) < 1 {
-				fmt.Println("Error: You need to provide a boolean for hidding buckets.\n     $ get <buckets_hidding>")
+				fmt.Println("Error: You need to provide a boolean for hidding buckets.\n     $ show-routing-table <buckets_hidding>")
 			}
 			bucketsHidding, err := strconv.ParseBool(string(input[1]))
 			if err == nil {
@@ -167,7 +167,7 @@ func handleCommandLine(kademlia *Kademlia) {
 			return
 
 		default:
-			fmt.Println("Invalid command, please try again.\nValids commands are:\n     $ join <ip> <port>\n     $ lookup <ip> <port>\n     $ ping <ip> <port>\n     $ put <data>\n     $ get <kademlia_id>\n     $ exit")
+			fmt.Println("Invalid command, please try again.\nValids commands are:\n     $ join <ip> <port>\n     $ lookup <ip> <port>\n     $ ping <ip> <port>\n     $ put <data>\n     $ get <data_kademlia_id>\n     $ show-storage\n     $ show-routing-table <buckets_hidding>\n     $ exit")
 			break
 
 		}
