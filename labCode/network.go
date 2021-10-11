@@ -62,8 +62,12 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 		case "PING":
 			break
 
+		case "REFRESH":
+			kademlia.storage.RefreshData(message[1], message[2])
+
 		case "STORE":
-			kademlia.storage.Put(HexToKademliaID(message[2]), message[3])
+			kademlia.storage.Put(message[1], HexToKademliaID(message[2]), message[3])
+			//kademlia.storage.Put(HexToKademliaID(message[2]),message[3])
 			break
 
 		case "FIND_NODE":
@@ -203,8 +207,44 @@ func (network *Network) SendFindDataMessage(kademlia *Kademlia, dataKademliaID *
 }
 
 func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target *Contact, channel chan bool) {
-
+	contact := *target
 	message := "STORE " + kademlia.routingTable.me.Address + " " + NewKademliaID(data).String() + " " + data
+
+	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
+	_, err := network.SendUDPMessage(target, message)
+
+	if err != nil {
+		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
+		channel <- false
+		return
+	}
+
+	/*var flag =0
+	for i:=0;i<len(kademlia.storage.dataNodes); i++{
+		if kademlia.storage.dataNodes[i]== contact{
+			flag = 1
+		}
+	}
+	if flag==0{
+		kademlia.storage.dataNodes=append(kademlia.storage.dataNodes, contact)
+	}*/
+
+	var flag = 0
+	for i := 0; i < len(kademlia.contact); i++ {
+		if kademlia.contact[i] == contact {
+			flag = 1
+		}
+	}
+	if flag == 0 {
+		kademlia.contact = append(kademlia.contact, contact)
+	}
+	channel <- true
+
+}
+
+func (network *Network) SendRefreshMessage(kademlia *Kademlia, target *Contact, channel chan bool) {
+
+	message := "REFRESH " + kademlia.routingTable.me.Address + " " + target.ID.String()
 
 	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
 	_, err := network.SendUDPMessage(target, message)

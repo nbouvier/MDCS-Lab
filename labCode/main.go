@@ -24,6 +24,8 @@ func main() {
 	fmt.Printf("IP address is %s\nKademliaID is %s\n", kademlia.routingTable.me.Address, kademlia.routingTable.me.ID)
 
 	go network.Listen(kademlia, port)
+	go kademlia.storage.TimeToLive()
+	go kademlia.Refresh()
 
 	if len(os.Args) > 1 && os.Args[1] == "entry" {
 		idle()

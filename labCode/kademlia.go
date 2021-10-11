@@ -11,6 +11,7 @@ import (
 type Kademlia struct {
 	routingTable *RoutingTable
 	storage      *Storage
+	contact      []Contact
 }
 
 // NewKademlia returns a new instance of Kademlia
@@ -20,6 +21,7 @@ func NewKademlia(ip net.IP, port int) *Kademlia {
 	address := ip.String() + ":" + strconv.Itoa(port)
 	kademlia.routingTable = NewRoutingTable(NewContact(NewKademliaID(address), address))
 	kademlia.storage = NewStorage()
+	kademlia.contact = []Contact{}
 
 	return &kademlia
 }
@@ -47,6 +49,39 @@ func (kademlia *Kademlia) Ping(contact Contact) {
 		fmt.Printf("Ping to %s (%s) timed out.\n", contact.Address, contact.ID)
 	}
 
+}
+
+func (kademlia *Kademlia) Refresh() {
+
+	var network Network
+	channel := make(chan bool)
+	defer close(channel)
+
+	for {
+
+		for i := range kademlia.contact {
+
+			contact := kademlia.contact[i]
+
+			go network.SendRefreshMessage(kademlia, &contact, channel)
+
+			select {
+
+			case result := <-channel:
+				if result {
+					fmt.Printf("Refresh to %s (%s) succeed.\n", contact.Address, contact.ID)
+					kademlia.routingTable.AddContact(contact)
+				} else {
+					fmt.Printf("Failed to Refresh %s (%s).\n", contact.Address, contact.ID)
+				}
+				break
+
+			case <-time.After(delayBeforeTimeOut * time.Second):
+				fmt.Printf("Refresh to %s (%s) timed out.\n", contact.Address, contact.ID)
+			}
+		}
+		time.Sleep(20 * time.Second)
+	}
 }
 
 func (kademlia *Kademlia) LookupContact(searchedContact Contact) []Contact {
