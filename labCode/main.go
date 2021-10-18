@@ -168,8 +168,19 @@ func handleCommandLine(kademlia *Kademlia) {
 		case "exit":
 			return
 
+		case "help":
+			fmt.Println("     $ join <ip> <port>\n" +
+				"	  $ lookup <ip> <port>\n" +
+				"     $ ping <ip> <port>\n" +
+				"     $ put <data>\n" +
+				"     $ get <data_kademlia_id>\n" +
+				"     $ show-storage\n" +
+				"     $ show-routing-table <buckets_hidding>\n" +
+				"     $ exit")
+			break
+
 		default:
-			fmt.Println("Invalid command, please try again.\nValids commands are:\n     $ join <ip> <port>\n     $ lookup <ip> <port>\n     $ ping <ip> <port>\n     $ put <data>\n     $ get <data_kademlia_id>\n     $ show-storage\n     $ show-routing-table <buckets_hidding>\n     $ exit")
+			fmt.Println("Invalid command, please try again or print \"help\".")
 			break
 
 		}
