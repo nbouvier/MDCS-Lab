@@ -12,6 +12,7 @@ type Kademlia struct {
 	routingTable *RoutingTable
 	storage      *Storage
 	contact      []Contact
+	test         bool
 }
 
 // NewKademlia returns a new instance of Kademlia
@@ -22,6 +23,18 @@ func NewKademlia(ip net.IP, port int) *Kademlia {
 	kademlia.routingTable = NewRoutingTable(NewContact(NewKademliaID(address), address))
 	kademlia.storage = NewStorage()
 	kademlia.contact = []Contact{}
+	kademlia.test = false
+
+	return &kademlia
+}
+
+func NewTestKademlia(kademliaID string) *Kademlia {
+	var kademlia Kademlia
+
+	kademlia.routingTable = NewRoutingTable(NewContact(HexToKademliaID(kademliaID), "172.19.0.2:80"))
+	kademlia.storage = NewStorage()
+	kademlia.contact = []Contact{}
+	kademlia.test = true
 
 	return &kademlia
 }
@@ -32,7 +45,12 @@ func (kademlia *Kademlia) Ping(contact Contact) {
 	channel := make(chan bool)
 	defer close(channel)
 
-	go network.SendPingMessage(kademlia, &contact, channel)
+	if !kademlia.test {
+		go network.SendPingMessage(kademlia, &contact, channel)
+	} else {
+		testNetwork := NewTestNetwork()
+		go testNetwork.SendPingMessage(kademlia, &contact, channel)
+	}
 
 	select {
 
@@ -63,7 +81,12 @@ func (kademlia *Kademlia) Refresh() {
 
 			contact := kademlia.contact[i]
 
-			go network.SendRefreshMessage(kademlia, &contact, channel)
+			if !kademlia.test {
+				go network.SendRefreshMessage(kademlia, &contact, channel)
+			} else {
+				testNetwork := NewTestNetwork()
+				go testNetwork.SendRefreshMessage(kademlia, &contact, channel)
+			}
 
 			select {
 
@@ -80,7 +103,13 @@ func (kademlia *Kademlia) Refresh() {
 				fmt.Printf("Refresh to %s (%s) timed out.\n", contact.Address, contact.ID)
 			}
 		}
+
+		if kademlia.test {
+			break
+		}
+
 		time.Sleep(20 * time.Second)
+
 	}
 }
 
@@ -101,7 +130,12 @@ func (kademlia *Kademlia) LookupContact(searchedContact Contact) []Contact {
 		responseWaitingNumber := len(contactsToContact)
 		for i := range contactsToContact {
 			if !contactsToContact[i].Equals(&kademlia.routingTable.me) {
-				go network.SendFindContactMessage(kademlia, &searchedContact, &contactsToContact[i], &closestContacts, channel)
+				if !kademlia.test {
+					go network.SendFindContactMessage(kademlia, &searchedContact, &contactsToContact[i], &closestContacts, channel)
+				} else {
+					testNetwork := NewTestNetwork()
+					go testNetwork.SendFindContactMessage(kademlia, &searchedContact, &contactsToContact[i], &closestContacts, channel)
+				}
 			} else {
 				responseWaitingNumber -= 1
 			}
@@ -160,7 +194,12 @@ func (kademlia *Kademlia) LookupData(dataKademliaID *KademliaID) (string, []Cont
 		contactsToContact := notContactedContacts.GetContacts(alpha)
 		responseWaitingNumber := len(contactsToContact)
 		for i := range contactsToContact {
-			go network.SendFindDataMessage(kademlia, dataKademliaID, &contactsToContact[i], &closestContacts, channel)
+			if !kademlia.test {
+				go network.SendFindDataMessage(kademlia, dataKademliaID, &contactsToContact[i], &closestContacts, channel)
+			} else {
+				testNetwork := NewTestNetwork()
+				go testNetwork.SendFindDataMessage(kademlia, dataKademliaID, &contactsToContact[i], &closestContacts, channel)
+			}
 			contactedContacts.AppendOne(contactsToContact[i])
 		}
 
@@ -219,10 +258,21 @@ func (kademlia *Kademlia) Store(data string) {
 	// Only sending to closest contact
 	// Can be improved by sending to multiple contacts
 	// See Lookup to do so
-	_, contacts := kademlia.LookupData(dataKademliaID)
+	var contacts []Contact
+	if !kademlia.test {
+		_, contacts = kademlia.LookupData(dataKademliaID)
+	} else {
+		kademlia := NewTestKademlia("ffffffffffffffffffff00000000000000000000")
+		_, contacts = kademlia.LookupData(NewKademliaID("some data"))
+	}
 	contact := contacts[0]
 
-	go network.SendStoreMessage(kademlia, data, &contact, channel)
+	if !kademlia.test {
+		go network.SendStoreMessage(kademlia, data, &contact, channel)
+	} else {
+		testNetwork := NewTestNetwork()
+		go testNetwork.SendStoreMessage(kademlia, data, &contact, channel)
+	}
 
 	select {
 
