@@ -212,33 +212,35 @@ func (kademlia *Kademlia) LookupData(dataKademliaID *KademliaID) (string, []Cont
 func (kademlia *Kademlia) Store(data string) {
 
 	var network Network
-	channel := make(chan bool)
+	channel := make(chan *Contact)
 	defer close(channel)
 
 	dataKademliaID := NewKademliaID(data)
-	// Only sending to closest contact
-	// Can be improved by sending to multiple contacts
-	// See Lookup to do so
-	_, contacts := kademlia.LookupData(dataKademliaID)
-	contact := contacts[0]
+	contacts := kademlia.routingTable.FindClosestContacts(dataKademliaID, bucketSize)
+	responseWaitingNumber := len(contacts)
+	fmt.Printf("debug size %d", responseWaitingNumber)
+	for i := range contacts {
 
-	go network.SendStoreMessage(kademlia, data, &contact, channel)
-
-	select {
-
-	case result := <-channel:
-		if result {
-			fmt.Printf("Stored \"%s\" (%s) to %s (%s) successfully.\n", data, dataKademliaID, contact.Address, contact.ID)
-			kademlia.routingTable.AddContact(contact)
-		} else {
-			fmt.Printf("Failed to store \"%s\" (%s) to %s (%s).\n", data, dataKademliaID, contact.Address, contact.ID)
-		}
-		break
-
-	case <-time.After(delayBeforeTimeOut * time.Second):
-		fmt.Printf("Failed to store \"%s\" (%s) to %s (%s) (Timeout).\n", data, dataKademliaID, contact.Address, contact.ID)
-		break
+		go network.SendStoreMessage(kademlia, data, &contacts[i], channel)
 
 	}
 
+	for i := 0; i < responseWaitingNumber; i++ {
+		select {
+
+		case contacted := <-channel:
+			if contacted != nil {
+				fmt.Printf("Stored \"%s\" (%s) to %s (%s) successfully.\n", data, dataKademliaID, contacted.Address, contacted.ID)
+				kademlia.routingTable.AddContact(*contacted)
+			} else {
+				fmt.Printf("Failed to store \"%s\" (%s) to %s (%s).\n", data, dataKademliaID, contacted.Address, contacted.ID)
+			}
+			break
+
+		case <-time.After(delayBeforeTimeOut * time.Second):
+			fmt.Println("Timeout.")
+			break
+
+		}
+	}
 }

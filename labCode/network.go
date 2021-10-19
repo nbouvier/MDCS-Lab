@@ -206,7 +206,7 @@ func (network *Network) SendFindDataMessage(kademlia *Kademlia, dataKademliaID *
 
 }
 
-func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target *Contact, channel chan bool) {
+func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target *Contact, channel chan *Contact) {
 	contact := *target
 	message := "STORE " + kademlia.routingTable.me.Address + " " + NewKademliaID(data).String() + " " + data
 
@@ -215,19 +215,9 @@ func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target
 
 	if err != nil {
 		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
-		channel <- false
+		channel <- nil
 		return
 	}
-
-	/*var flag =0
-	for i:=0;i<len(kademlia.storage.dataNodes); i++{
-		if kademlia.storage.dataNodes[i]== contact{
-			flag = 1
-		}
-	}
-	if flag==0{
-		kademlia.storage.dataNodes=append(kademlia.storage.dataNodes, contact)
-	}*/
 
 	var flag = 0
 	for i := 0; i < len(kademlia.contact); i++ {
@@ -238,7 +228,7 @@ func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target
 	if flag == 0 {
 		kademlia.contact = append(kademlia.contact, contact)
 	}
-	channel <- true
+	channel <- &contact
 
 }
 
@@ -250,7 +240,7 @@ func (network *Network) SendRefreshMessage(kademlia *Kademlia, target *Contact, 
 	_, err := network.SendUDPMessage(target, message)
 
 	if err != nil {
-		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
+		fmt.Printf("Error while sending REFRESH message to %s (%s).\n%s\n", target.Address, target.ID, err)
 		channel <- false
 		return
 	}
@@ -287,61 +277,6 @@ func (network *Network) SendUDPMessage(contact *Contact, message string) (string
 	return string(buffer[0:n]), nil
 
 }
-
-/*
-func (network *Network) SendUDPMessage(contact *Contact, message string) (string, error) {
-
-	var c *net.UDPConn
-
-	i := 0
-	err := errors.New("Enter loop.")
-	for i < udpTryNumber && err != nil {
-
-		i++
-		err = nil
-
-		s, err := net.ResolveUDPAddr("udp4", contact.Address)
-		if err != nil {
-			fmt.Printf("Failed at iteration %d.\n", i)
-			time.Sleep(delayBetweenUDPTries * time.Millisecond)
-			continue
-		}
-
-		c, err = net.DialUDP("udp4", nil, s)
-		if err != nil {
-			fmt.Printf("Failed at iteration %d.\n", i)
-			time.Sleep(delayBetweenUDPTries * time.Millisecond)
-			continue
-		}
-		defer c.close()
-
-		_, err = c.Write([]byte(message))
-		if err != nil {
-			fmt.Printf("Failed at iteration %d.\n", i)
-			time.Sleep(delayBetweenUDPTries * time.Millisecond)
-			continue
-		}
-
-	}
-
-	if i == 3 {
-		fmt.Printf("Failed 3 times in a raw.\n")
-		return "", err
-	} else {
-
-		buffer := make([]byte, 1024)
-		n, _, err := c.ReadFromUDP(buffer)
-		if err != nil {
-			fmt.Printf("Failed to read UDP response.\n")
-			return "", err
-		}
-
-		return string(buffer[0:n]), nil
-
-	}
-
-}
-*/
 
 // Send stringData as an UDP response to addr
 func SendUDPResponse(stringData string, addr *net.UDPAddr, connection *net.UDPConn) error {
