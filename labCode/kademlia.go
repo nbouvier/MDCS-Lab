@@ -12,6 +12,7 @@ type Kademlia struct {
 	routingTable *RoutingTable
 	storage      *Storage
 	contact      []Contact
+	refreshTime  int
 	test         bool
 }
 
@@ -23,6 +24,7 @@ func NewKademlia(ip net.IP, port int) *Kademlia {
 	kademlia.routingTable = NewRoutingTable(NewContact(NewKademliaID(address), address))
 	kademlia.storage = NewStorage()
 	kademlia.contact = []Contact{}
+	kademlia.refreshTime = 20
 	kademlia.test = false
 
 	return &kademlia
@@ -34,6 +36,7 @@ func NewTestKademlia(kademliaID string) *Kademlia {
 	kademlia.routingTable = NewRoutingTable(NewContact(HexToKademliaID(kademliaID), "172.19.0.2:80"))
 	kademlia.storage = NewStorage()
 	kademlia.contact = []Contact{}
+	kademlia.refreshTime = 20
 	kademlia.test = true
 
 	return &kademlia
@@ -120,7 +123,7 @@ func (kademlia *Kademlia) Refresh() {
 			break
 		}
 
-		time.Sleep(20 * time.Second)
+		time.Sleep(time.Duration(kademlia.refreshTime) * time.Second)
 
 	}
 }
@@ -267,7 +270,8 @@ func (kademlia *Kademlia) Store(data string) {
 	defer close(channel)
 
 	dataKademliaID := NewKademliaID(data)
-	contacts := kademlia.routingTable.FindClosestContacts(dataKademliaID, bucketSize)
+	// contacts := kademlia.routingTable.FindClosestContacts(dataKademliaID, bucketSize)
+	contacts := kademlia.LookupContact(NewContact(NewKademliaID(data), data))
 	responseWaitingNumber := len(contacts)
 
 	for i := range contacts {

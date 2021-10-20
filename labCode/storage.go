@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const TTL = 40 * time.Duration(1000000000)
+const TTL = 40 * time.Second
 
 type Storage struct {
 	storedData map[string]Data
@@ -50,7 +50,7 @@ func (storage *Storage) TimeToLive() {
 			f(&t, &k, storage)
 		}
 
-		time.Sleep(1000000000)
+		time.Sleep(1 * time.Second)
 
 	}
 }
@@ -58,7 +58,7 @@ func (storage *Storage) TimeToLive() {
 func f(t *Data, k *string, storage *Storage) {
 
 	ttl := t.storedTime
-	ttl = ttl - time.Duration(1000000000)
+	ttl = ttl - 1*time.Second
 
 	if ttl != 0 {
 		t.storedTime = ttl

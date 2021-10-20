@@ -165,6 +165,13 @@ func handleCommandLine(kademlia *Kademlia) {
 			fmt.Println(kademlia.storage)
 			break
 
+		case "set-refresh-time":
+			if len(inputs) < 1 {
+				fmt.Println("Error: You need to provide a number of seconds.\n     $ set-refresh-time <seconds>")
+			}
+			kademlia.refreshTime, _ = strconv.Atoi(inputs[1])
+			break
+
 		case "exit":
 			return
 

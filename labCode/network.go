@@ -281,8 +281,9 @@ func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target
 
 	var flag = 0
 	for i := 0; i < len(kademlia.contact); i++ {
-		if kademlia.contact[i] == contact {
+		if kademlia.contact[i].Equals(&contact) {
 			flag = 1
+			break
 		}
 	}
 	if flag == 0 {
