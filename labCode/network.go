@@ -71,7 +71,9 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 		data := kademlia.routingTable.me.Address
 		unknownRPC := false
 
-		fmt.Printf("\nReceived from %s (%s): %s\n", senderAddress, senderKademliaID, buffer[0:n])
+		if debug {
+			fmt.Printf("\nReceived from %s (%s): %s\n", senderAddress, senderKademliaID, buffer[0:n])
+		}
 		switch message[0] {
 
 		case "PING":
@@ -116,7 +118,7 @@ func (network *Network) Listen(kademlia *Kademlia, port int) {
 			err = SendUDPResponse(data, addr, connection)
 			if err == nil {
 				kademlia.routingTable.AddContact(NewContact(senderKademliaID, senderAddress))
-			} else {
+			} else if debug {
 				fmt.Printf("Error while responding to %s (%s).\n%s\n", senderAddress, senderKademliaID, err)
 			}
 		}
@@ -143,7 +145,9 @@ func (network *Network) SendPingMessage(kademlia *Kademlia, target *Contact, cha
 
 	message := "PING " + kademlia.routingTable.me.Address
 
-	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
+	if debug {
+		fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
+	}
 	if !network.test {
 		_, err = network.SendUDPMessage(target, message)
 	} else {
@@ -151,7 +155,9 @@ func (network *Network) SendPingMessage(kademlia *Kademlia, target *Contact, cha
 	}
 
 	if err != nil {
-		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
+		if debug {
+			fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
+		}
 		channel <- false
 		return
 	}
@@ -167,7 +173,9 @@ func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchContact
 
 	message := "FIND_NODE " + kademlia.routingTable.me.Address + " " + searchContact.Address
 
-	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
+	if debug {
+		fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
+	}
 	if !network.test {
 		reply, err = network.SendUDPMessage(target, message)
 	} else {
@@ -175,7 +183,9 @@ func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchContact
 	}
 
 	if err != nil {
-		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
+		if debug {
+			fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
+		}
 		channel <- nil
 		return
 	}
@@ -205,7 +215,9 @@ func (network *Network) SendFindDataMessage(kademlia *Kademlia, dataKademliaID *
 
 	message := "FIND_VALUE " + kademlia.routingTable.me.Address + " " + dataKademliaID.String()
 
-	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
+	if debug {
+		fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
+	}
 	if !network.test {
 		reply, err = network.SendUDPMessage(target, message)
 	} else {
@@ -213,7 +225,9 @@ func (network *Network) SendFindDataMessage(kademlia *Kademlia, dataKademliaID *
 	}
 
 	if err != nil {
-		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
+		if debug {
+			fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
+		}
 		channel <- ""
 		return
 	}
@@ -248,7 +262,9 @@ func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target
 	contact := *target
 	message := "STORE " + kademlia.routingTable.me.Address + " " + NewKademliaID(data).String() + " " + data
 
-	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
+	if debug {
+		fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
+	}
 	if !network.test {
 		_, err = network.SendUDPMessage(target, message)
 	} else {
@@ -256,7 +272,9 @@ func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target
 	}
 
 	if err != nil {
-		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
+		if debug {
+			fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
+		}
 		channel <- nil
 		return
 	}
@@ -280,7 +298,9 @@ func (network *Network) SendRefreshMessage(kademlia *Kademlia, target *Contact, 
 
 	message := "REFRESH " + kademlia.routingTable.me.Address + " " + target.ID.String()
 
-	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
+	if debug {
+		fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
+	}
 	if !network.test {
 		_, err = network.SendUDPMessage(target, message)
 	} else {
@@ -288,7 +308,9 @@ func (network *Network) SendRefreshMessage(kademlia *Kademlia, target *Contact, 
 	}
 
 	if err != nil {
-		fmt.Printf("Error while sending REFRESH message to %s (%s).\n%s\n", target.Address, target.ID, err)
+		if debug {
+			fmt.Printf("Error while sending REFRESH message to %s (%s).\n%s\n", target.Address, target.ID, err)
+		}
 		channel <- false
 		return
 	}
@@ -318,7 +340,6 @@ func (network *Network) SendUDPMessage(contact *Contact, message string) (string
 
 	_, err = c.Write([]byte(message))
 	if err != nil {
-		fmt.Printf("Error 3 with %s\n", []byte(message))
 		return "", err
 	}
 
@@ -334,7 +355,10 @@ func (network *Network) SendUDPMessage(contact *Contact, message string) (string
 
 // Send stringData as an UDP response to addr
 func SendUDPResponse(stringData string, addr *net.UDPAddr, connection *net.UDPConn) error {
-	fmt.Printf("Respond to %s: %s\n\n", addr, stringData)
+
+	if debug {
+		fmt.Printf("Respond to %s: %s\n\n", addr, stringData)
+	}
 	data := []byte(stringData)
 	_, err := connection.WriteToUDP(data, addr)
 

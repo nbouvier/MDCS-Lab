@@ -56,7 +56,9 @@ func (kademlia *Kademlia) Ping(contact Contact) {
 
 	case result := <-channel:
 		if result {
-			fmt.Printf("Ping to %s (%s) succeed.\n", contact.Address, contact.ID)
+			if !kademlia.test {
+				fmt.Printf("Ping to %s (%s) succeed.\n", contact.Address, contact.ID)
+			}
 			kademlia.routingTable.AddContact(contact)
 		} else {
 			fmt.Printf("Failed to ping %s (%s).\n", contact.Address, contact.ID)
@@ -77,6 +79,10 @@ func (kademlia *Kademlia) Refresh() {
 
 	for {
 
+		if len(kademlia.contact) > 0 && !kademlia.test {
+			fmt.Printf("Sending refresh to %d nodes.\n", len(kademlia.contact))
+		}
+
 		for i := range kademlia.contact {
 
 			contact := kademlia.contact[i]
@@ -92,15 +98,21 @@ func (kademlia *Kademlia) Refresh() {
 
 			case result := <-channel:
 				if result {
-					fmt.Printf("Refresh to %s (%s) succeed.\n", contact.Address, contact.ID)
+					if debug {
+						fmt.Printf("Refresh to %s (%s) succeed.\n", contact.Address, contact.ID)
+					}
 					kademlia.routingTable.AddContact(contact)
 				} else {
-					fmt.Printf("Failed to Refresh %s (%s).\n", contact.Address, contact.ID)
+					if debug {
+						fmt.Printf("Failed to Refresh %s (%s).\n", contact.Address, contact.ID)
+					}
 				}
 				break
 
 			case <-time.After(delayBeforeTimeOut * time.Second):
-				fmt.Printf("Refresh to %s (%s) timed out.\n", contact.Address, contact.ID)
+				if debug {
+					fmt.Printf("Refresh to %s (%s) timed out.\n", contact.Address, contact.ID)
+				}
 			}
 		}
 
@@ -257,7 +269,7 @@ func (kademlia *Kademlia) Store(data string) {
 	dataKademliaID := NewKademliaID(data)
 	contacts := kademlia.routingTable.FindClosestContacts(dataKademliaID, bucketSize)
 	responseWaitingNumber := len(contacts)
-	fmt.Printf("debug size %d", responseWaitingNumber)
+
 	for i := range contacts {
 
 		if !kademlia.test {
@@ -274,7 +286,9 @@ func (kademlia *Kademlia) Store(data string) {
 
 		case contacted := <-channel:
 			if contacted != nil {
-				fmt.Printf("Stored \"%s\" (%s) to %s (%s) successfully.\n", data, dataKademliaID, contacted.Address, contacted.ID)
+				if !kademlia.test {
+					fmt.Printf("Stored \"%s\" (%s) to %s (%s) successfully.\n", data, dataKademliaID, contacted.Address, contacted.ID)
+				}
 				kademlia.routingTable.AddContact(*contacted)
 			} else {
 				fmt.Printf("Failed to store \"%s\" (%s) to %s (%s).\n", data, dataKademliaID, contacted.Address, contacted.ID)

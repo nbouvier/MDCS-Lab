@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const debug = false
+
 func main() {
 
 	var network Network
@@ -42,11 +44,9 @@ func autoConnect(kademlia *Kademlia) {
 	var addr *net.IPAddr
 
 	err := errors.New("Looking for kademliaEntry")
-	fmt.Println("Looking for kademliaEntry...")
 	for err != nil {
 		addr, err = net.ResolveIPAddr("ip4:icmp", "kademliaEntry")
 	}
-	fmt.Printf("KademliaEntry found\n\n.")
 
 	rand.Seed(time.Now().UnixNano())
 	time.Sleep(time.Second*time.Duration(rand.Intn(60)) + time.Second*time.Duration(10))
@@ -107,9 +107,9 @@ func handleCommandLine(kademlia *Kademlia) {
 			contacts := kademlia.LookupContact(NewContact(kademliaID, address))
 			stringifiedContacts := ""
 			for _, contact := range contacts {
-				stringifiedContacts += contact.String()
+				stringifiedContacts += contact.String() + "\n"
 			}
-			fmt.Printf("Closest contacts for %s (%s): [%s]\n", address, kademliaID, stringifiedContacts)
+			fmt.Printf("Closest contacts for %s (%s): (%d)[\n%s]\n", address, kademliaID, len(contacts), stringifiedContacts)
 			break
 
 		case "ping":
@@ -141,9 +141,9 @@ func handleCommandLine(kademlia *Kademlia) {
 			if contacts != nil {
 				stringifiedContacts := ""
 				for _, contact := range contacts {
-					stringifiedContacts += contact.String()
+					stringifiedContacts += contact.String() + "\n"
 				}
-				fmt.Printf("Data not found.\nClosest contacts for %s: [%s]\n", kademliaID, stringifiedContacts)
+				fmt.Printf("Data not found.\nClosest contacts for %s: (%d)[\n%s]\n", kademliaID, len(contacts), stringifiedContacts)
 			} else {
 				fmt.Printf("Data found: %s.\n", data)
 			}
