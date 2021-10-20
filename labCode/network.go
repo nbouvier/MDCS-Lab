@@ -23,7 +23,22 @@ const delayBeforeTimeOut = 5
 // the static listening port number of the kademliaEntry node
 const kademliaEntryListeningPort = 80
 
+const testPingResponse = "172.18.0.2:80"
+const testFindContactResponse = "172.18.0.2:80 172.18.0.3:80"
+const testFindDataResponse = "172.18.0.2:80 172.18.0.3:80 172.18.0.4:80"
+const testStoreResponse = "172.18.0.2:80"
+const testRefreshResponse = ""
+
 type Network struct {
+	test bool
+}
+
+func NewTestNetwork() *Network {
+	var network Network
+
+	network.test = true
+
+	return &network
 }
 
 func (network *Network) Listen(kademlia *Kademlia, port int) {
@@ -124,10 +139,16 @@ func GetOutboundIP() (net.IP, int) {
 
 func (network *Network) SendPingMessage(kademlia *Kademlia, target *Contact, channel chan bool) {
 
+	var err error
+
 	message := "PING " + kademlia.routingTable.me.Address
 
 	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
-	_, err := network.SendUDPMessage(target, message)
+	if !network.test {
+		_, err = network.SendUDPMessage(target, message)
+	} else {
+		_, err = network.SimulateUDPMessage(testPingResponse)
+	}
 
 	if err != nil {
 		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
@@ -141,10 +162,17 @@ func (network *Network) SendPingMessage(kademlia *Kademlia, target *Contact, cha
 
 func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchContact *Contact, target *Contact, closestContacts *ContactCandidates, channel chan *Contact) {
 
+	var err error
+	var reply string
+
 	message := "FIND_NODE " + kademlia.routingTable.me.Address + " " + searchContact.Address
 
 	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
-	reply, err := network.SendUDPMessage(target, message)
+	if !network.test {
+		reply, err = network.SendUDPMessage(target, message)
+	} else {
+		reply, err = network.SimulateUDPMessage(testFindContactResponse)
+	}
 
 	if err != nil {
 		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
@@ -172,10 +200,17 @@ func (network *Network) SendFindContactMessage(kademlia *Kademlia, searchContact
 
 func (network *Network) SendFindDataMessage(kademlia *Kademlia, dataKademliaID *KademliaID, target *Contact, closestContacts *ContactCandidates, channel chan string) {
 
+	var err error
+	var reply string
+
 	message := "FIND_VALUE " + kademlia.routingTable.me.Address + " " + dataKademliaID.String()
 
 	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
-	reply, err := network.SendUDPMessage(target, message)
+	if !network.test {
+		reply, err = network.SendUDPMessage(target, message)
+	} else {
+		reply, err = network.SimulateUDPMessage(testFindDataResponse)
+	}
 
 	if err != nil {
 		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
@@ -207,11 +242,18 @@ func (network *Network) SendFindDataMessage(kademlia *Kademlia, dataKademliaID *
 }
 
 func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target *Contact, channel chan *Contact) {
+
+	var err error
+
 	contact := *target
 	message := "STORE " + kademlia.routingTable.me.Address + " " + NewKademliaID(data).String() + " " + data
 
 	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
-	_, err := network.SendUDPMessage(target, message)
+	if !network.test {
+		_, err = network.SendUDPMessage(target, message)
+	} else {
+		_, err = network.SimulateUDPMessage(testStoreResponse)
+	}
 
 	if err != nil {
 		fmt.Printf("Error while sending message to %s (%s).\n%s\n", target.Address, target.ID, err)
@@ -234,10 +276,16 @@ func (network *Network) SendStoreMessage(kademlia *Kademlia, data string, target
 
 func (network *Network) SendRefreshMessage(kademlia *Kademlia, target *Contact, channel chan bool) {
 
+	var err error
+
 	message := "REFRESH " + kademlia.routingTable.me.Address + " " + target.ID.String()
 
 	fmt.Printf("Sending to %s (%s): %s\n", target.Address, target.ID, message)
-	_, err := network.SendUDPMessage(target, message)
+	if !network.test {
+		_, err = network.SendUDPMessage(target, message)
+	} else {
+		_, err = network.SimulateUDPMessage(testRefreshResponse)
+	}
 
 	if err != nil {
 		fmt.Printf("Error while sending REFRESH message to %s (%s).\n%s\n", target.Address, target.ID, err)
@@ -246,6 +294,12 @@ func (network *Network) SendRefreshMessage(kademlia *Kademlia, target *Contact, 
 	}
 
 	channel <- true
+
+}
+
+func (network *Network) SimulateUDPMessage(response string) (string, error) {
+
+	return response, nil
 
 }
 
